@@ -55,6 +55,7 @@ const State = {
   appModalData: null,
   showAdminPreviewModal: false,
   adminPreviewListing: null,
+  adminSidebarOpen: false,  // mobile sidebar toggle
 
   // Async States
   loading: {},
@@ -183,13 +184,13 @@ function renderNavbar() {
                 <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 0.82rem;">No notifications yet</div>
               ` : State.notifications.map(n => `
                 <div class="notif-item" role="menuitem">
-                  <div class="notif-text" style="font-weight:${n.read ? '400' : '600'};">${n.text}</div>
+                  <div class="notif-text" style="font-weight:${n.read ? '400' : '600'}">${n.text}</div>
                   <div class="notif-time">${n.time}</div>
                 </div>
               `).join('')}
             </div>
           </div>
-          <div class="member-avatar" onclick="navigate('#/dashboard')" style="width:36px; height:36px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:1.15rem; cursor:pointer; text-transform:uppercase; border:2px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,0.12);" title="My Account Dashboard">
+          <div class="member-avatar" onclick="navigate('#/dashboard')" style="width:44px; height:44px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:1.15rem; cursor:pointer; text-transform:uppercase; border:2px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,0.12);" title="My Account Dashboard">
             ${(State.currentMember?.email || 'M').charAt(0)}
           </div>
         ` : `
@@ -197,7 +198,13 @@ function renderNavbar() {
         `}
       </div>
     </div>
-  </nav>`;
+  </nav>
+
+  <!-- Mobile bottom nav tabs (Rooms / Jobs) -->
+  <div class="mobile-nav-tabs" role="tablist" aria-label="Browse mode">
+    <button class="mobile-nav-tab ${State.mode === 'rooms' ? 'active' : ''}" onclick="setMode('rooms')" role="tab" aria-selected="${State.mode === 'rooms'}" id="mobile-tab-rooms">🏠 Rooms</button>
+    <button class="mobile-nav-tab ${State.mode === 'jobs' ? 'active' : ''}" onclick="setMode('jobs')" role="tab" aria-selected="${State.mode === 'jobs'}" id="mobile-tab-jobs">💼 Jobs</button>
+  </div>`;
 }
 
 function renderFooter() {
@@ -721,7 +728,7 @@ function renderApplyFlow(listingId) {
           <input id="ap-name" class="form-control" type="text" placeholder="Ramesh Shrestha" required value="${State.applyFormData.name || ''}" oninput="State.applyFormData.name=this.value" />
         </div>
         
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
           <div class="form-group">
             <label for="ap-phone">Mobile Phone Number <span class="required">*</span></label>
             <input id="ap-phone" class="form-control" type="tel" placeholder="98XXXXXXXX" required pattern="[0-9]{10}" value="${State.applyFormData.phone || ''}" oninput="State.applyFormData.phone=this.value" />
@@ -732,7 +739,7 @@ function renderApplyFlow(listingId) {
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
           <div class="form-group">
             <label for="ap-occ">Current Occupation <span class="required">*</span></label>
             <input id="ap-occ" class="form-control" type="text" placeholder="e.g. Student, Accountant" required value="${State.applyFormData.occ || ''}" oninput="State.applyFormData.occ=this.value" />
@@ -761,7 +768,7 @@ function renderApplyFlow(listingId) {
             🔒 Upload Verification Document (Restricted Admin Review Only)
           </div>
           
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
             <div>
               <label for="ap-citfront" style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">Front side image <span class="required">*</span></label>
               <input id="ap-citfront" type="file" accept="image/*" class="form-control" onchange="handleCitUpload('front', this)" ${State.applyFormData.citFront ? '' : 'required'} />
@@ -1168,15 +1175,18 @@ function renderAdminDashboard() {
 
   return `
   ${renderNavbar()}
+  <!-- Admin sidebar overlay (mobile) -->
+  <div class="admin-sidebar-overlay ${State.adminSidebarOpen ? 'visible' : ''}" onclick="State.adminSidebarOpen=false;render()" aria-hidden="true"></div>
+
   <div class="page-wrap" style="background:#F6F1EA;min-height:90vh;display:flex">
-    <!-- Sidebar -->
-    <div style="width:260px;background:#2B2724;border-right:1px solid rgba(255,255,255,0.12);padding:24px 16px;display:flex;flex-direction:column;justify-content:space-between">
+    <!-- Admin Sidebar -->
+    <div class="admin-sidebar ${State.adminSidebarOpen ? 'open' : ''}" id="admin-sidebar" style="background:#2B2724;border-right:1px solid rgba(255,255,255,0.12);padding:24px 16px;flex-direction:column;justify-content:space-between">
       <div style="display:flex;flex-direction:column;gap:6px">
         <div style="font-size:0.75rem;font-weight:700;color:rgba(246, 241, 234, 0.4);text-transform:uppercase;letter-spacing:0.06em;padding:0 12px;margin-bottom:12px">Control Panel</div>
         <button class="sidebar-nav-item ${State.adminSection === 'requests' ? 'active' : ''}" onclick="setAdminSection('requests')">Payment Requests</button>
         <button class="sidebar-nav-item ${State.adminSection === 'listings' ? 'active' : ''}" onclick="setAdminSection('listings')">Listings Manager</button>
-        <button class="sidebar-nav-item ${State.adminSection === 'categories' ? 'active' : ''}" onclick="setAdminSection('categories')">Locations & Seeds</button>
-        <button class="sidebar-nav-item ${State.adminSection === 'applications' ? 'active' : ''}" onclick="setAdminSection('applications')">Audits & Candidates</button>
+        <button class="sidebar-nav-item ${State.adminSection === 'categories' ? 'active' : ''}" onclick="setAdminSection('categories')">Locations &amp; Seeds</button>
+        <button class="sidebar-nav-item ${State.adminSection === 'applications' ? 'active' : ''}" onclick="setAdminSection('applications')">Audits &amp; Candidates</button>
         <button class="sidebar-nav-item ${State.adminSection === 'settings' ? 'active' : ''}" onclick="setAdminSection('settings')">Platform Settings</button>
       </div>
       <div style="padding-top:40px; border-top:1px solid rgba(255,255,255,0.1); margin-top:20px; text-align:center;">
@@ -1186,10 +1196,16 @@ function renderAdminDashboard() {
 
     <!-- Admin Content -->
     <div style="flex:1;padding:32px 40px;overflow-x:hidden">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px">
-        <div>
-          <h1 style="font-size:1.8rem;font-family:var(--font-heading);">${State.adminSection === 'requests' ? 'Payment Requests' : State.adminSection === 'listings' ? 'Listings Manager' : State.adminSection === 'categories' ? 'Locations & Categories' : State.adminSection === 'settings' ? 'Platform Settings' : 'All Applications'}</h1>
-          <p style="color:var(--text-muted);font-size:0.82rem;margin-top:4px;">Secure verification console • Admin: ${State.currentAdmin?.email || ''}</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;flex-wrap:wrap;gap:12px">
+        <div style="display:flex;align-items:center;gap:4px">
+          <!-- Hamburger toggle (visible on mobile only) -->
+          <button class="admin-hamburger" onclick="State.adminSidebarOpen=!State.adminSidebarOpen;render()" aria-label="Toggle navigation menu" aria-expanded="${State.adminSidebarOpen}">
+            ${State.adminSidebarOpen ? '✕' : '☰'}
+          </button>
+          <div>
+            <h1 style="font-size:1.8rem;font-family:var(--font-heading);">${State.adminSection === 'requests' ? 'Payment Requests' : State.adminSection === 'listings' ? 'Listings Manager' : State.adminSection === 'categories' ? 'Locations &amp; Categories' : State.adminSection === 'settings' ? 'Platform Settings' : 'All Applications'}</h1>
+            <p style="color:var(--text-muted);font-size:0.82rem;margin-top:4px;">Secure verification console • Admin: ${State.currentAdmin?.email || ''}</p>
+          </div>
         </div>
         ${State.adminSection === 'listings' ? `
           <button class="btn btn-primary btn-sm" onclick="State.showCreateModal=true;render()">+ Add New Listing</button>
@@ -1943,6 +1959,7 @@ window.adminLogout = async function () {
 // Admin Action Triggers
 window.setAdminSection = function (s) {
   State.adminSection = s;
+  State.adminSidebarOpen = false; // close sidebar on mobile after selecting section
   State.applications = null;
   State.listings = null;
   State.storageUsedGB = 0.0;
