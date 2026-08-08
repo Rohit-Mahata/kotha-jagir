@@ -141,7 +141,12 @@ async function videoToHls(videoBuffer, originalName) {
 
   console.log(`[HLS] Uploading ${allFiles.length} files to R2 under ${r2Prefix}/`);
   await Promise.all(allFiles.map(async ({ localPath, r2Key }) => {
-    const buf = await fsp.readFile(localPath);
+    let buf = await fsp.readFile(localPath);
+    if (r2Key.endsWith('.m3u8')) {
+      let text = buf.toString('utf8');
+      text = text.replace(/\\/g, '/');
+      buf = Buffer.from(text, 'utf8');
+    }
     const mime = r2Key.endsWith('.m3u8') ? 'application/vnd.apple.mpegurl'
                 : r2Key.endsWith('.ts') ? 'video/mp2t'
                 : 'application/octet-stream';
