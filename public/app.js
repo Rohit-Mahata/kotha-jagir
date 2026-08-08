@@ -486,12 +486,12 @@ function renderHomePage() {
         <h3 style="color:var(--primary); font-family:var(--font-heading); margin-bottom:14px; display:flex; align-items:center; gap:8px; font-size:1.1rem;">
           🔑 Verified Membership Terms & Service Charge Policy
         </h3>
-        <div class="policy-cols" style="display:grid; grid-template-columns:1fr 1fr; gap:28px; font-size:0.86rem; line-height:1.7; color:var(--text-body);">
-          <div style="border-right:1px solid rgba(0,0,0,0.08); padding-right:24px;">
-            <strong style="color:var(--text-dark); font-size:0.9rem; display:block; margin-bottom:6px;">🏠 Room & Flat Seekers</strong>
+        <div class="policy-cols">
+          <div class="policy-col policy-col-left">
+            <strong style="color:var(--text-dark); font-size:0.9rem; display:block; margin-bottom:6px;">🏠 Room &amp; Flat Seekers</strong>
             Your membership is valid for <strong>1 month</strong>. You can view as many flats/rooms as you want until you find one you like. If you haven't seen any rooms within the month, you can request to extend the period. Upon final confirmation, you will pay a service charge to the agent who showed you the rooms.
           </div>
-          <div>
+          <div class="policy-col">
             <strong style="color:var(--text-dark); font-size:0.9rem; display:block; margin-bottom:6px;">💼 Job Seekers</strong>
             Your membership is valid for <strong>1 month</strong>. You can apply for jobs and request coordinates as many times as you need until you secure a job. If you haven't visited any jobs within the month, you can request to extend the period. Upon final employment confirmation, you will pay a service charge to the coordinating agent.
           </div>
@@ -598,7 +598,7 @@ function renderDetailPage(id) {
         <!-- Sidebar -->
         <div class="detail-sidebar">
           <div class="glass" style="border-radius:16px;padding:20px;margin-bottom:16px">
-            <h3 style="font-size:1rem;margin-bottom:14px">Exact Location</h3>
+            <h3 style="font-size:1rem;margin-bottom:14px">Location</h3>
             
             ${State.memberLoggedIn ? `
               <div class="verified-map-box" style="background:#e8f4ec; border:1px solid #a3cfb4; padding:16px; border-radius:12px; margin-bottom:16px; text-align:center;">
@@ -618,12 +618,7 @@ function renderDetailPage(id) {
                   <span style="font-size:0.72rem;color:rgba(255,255,255,0.65)">General area: ${item.locality}</span>
                 </div>
               </div>
-              <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
-                ${isRoom 
-                  ? 'Verified members get instant notifications of new room and flat listings before anyone else. This membership remains active until you successfully book a room/flat.'
-                  : 'Verified members get instant notifications of new job opportunities before anyone else. This membership remains active until you successfully secure a job.'
-                }
-              </p>
+              <div style="margin-bottom:12px;"></div>
               <button class="btn btn-primary w-full" onclick="navigate('#/apply/${item.id}')">Apply for Verified Membership ${Icon.arrow}</button>
             `}
           </div>
@@ -1178,7 +1173,7 @@ function renderAdminDashboard() {
   <!-- Admin sidebar overlay (mobile) -->
   <div class="admin-sidebar-overlay ${State.adminSidebarOpen ? 'visible' : ''}" onclick="State.adminSidebarOpen=false;render()" aria-hidden="true"></div>
 
-  <div class="page-wrap" style="background:#F6F1EA;min-height:90vh;display:flex">
+  <div class="admin-layout" style="background:#F6F1EA;min-height:90vh;">
     <!-- Admin Sidebar -->
     <div class="admin-sidebar ${State.adminSidebarOpen ? 'open' : ''}" id="admin-sidebar" style="background:#2B2724;border-right:1px solid rgba(255,255,255,0.12);padding:24px 16px;flex-direction:column;justify-content:space-between">
       <div style="display:flex;flex-direction:column;gap:6px">
@@ -2078,7 +2073,7 @@ window.renderMediaGallery = function (item, id) {
       <div class="detail-hero video-active">
         ${posterImage ? `<div class="video-bg-blur" style="background-image: url('${posterImage}');"></div>` : ''}
         <div class="portrait-video-wrapper">
-          <div class="video-loading-spinner" id="video-spinner" style="display: block;"></div>
+          <div class="video-loading-spinner" id="video-spinner" style="display: none;"></div>
           ${isHls ? `<div class="hls-quality-badge" id="hls-quality-badge" style="display:none"></div>` : ''}
           <video
             id="detail-video-player"
