@@ -601,28 +601,11 @@ function renderDetailPage(id) {
         <div class="detail-sidebar">
           <div class="glass" style="border-radius:16px;padding:20px;margin-bottom:16px">
             <h3 style="font-size:1rem;margin-bottom:14px">Location</h3>
-            
-            ${State.memberLoggedIn ? `
-              <div class="verified-map-box" style="background:#e8f4ec; border:1px solid #a3cfb4; padding:16px; border-radius:12px; margin-bottom:16px; text-align:center;">
-                <div style="font-size:1.5rem; margin-bottom:8px;">📍</div>
-                <div style="font-weight:700; color:#145a32; font-size:0.9rem;">Location Unlocked</div>
-                <div style="font-size:0.8rem; color:#1e6b3f; margin-top:4px;">Address: ${item.locality}, Kathmandu Valley</div>
-              </div>
-              <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px">As an active member, you have full access to view this address details.</p>
-            ` : `
-              <div class="locked-map">
-                <div class="locked-map-bg">
-                  <div style="width:100%;height:100%;background:repeating-linear-gradient(0deg,rgba(200,180,165,0.4) 0,rgba(200,180,165,0.4) 1px,transparent 1px,transparent 40px),repeating-linear-gradient(90deg,rgba(200,180,165,0.4) 0,rgba(200,180,165,0.4) 1px,transparent 1px,transparent 40px);"></div>
-                </div>
-                <div class="locked-map-overlay">
-                  <span class="locked-icon">${Icon.lock}</span>
-                  <span class="locked-text">Address is locked</span>
-                  <span style="font-size:0.72rem;color:rgba(255,255,255,0.65)">General area: ${item.locality}</span>
-                </div>
-              </div>
-              <div style="margin-bottom:12px;"></div>
-              <button class="btn btn-primary w-full" onclick="navigate('#/apply/${item.id}')">Apply for Verified Membership ${Icon.arrow}</button>
-            `}
+            <div class="verified-map-box" style="background:#e8f4ec; border:1px solid #a3cfb4; padding:16px; border-radius:12px; text-align:center;">
+              <div style="font-size:1.5rem; margin-bottom:8px;">📍</div>
+              <div style="font-weight:700; color:#145a32; font-size:0.9rem;">Location Details</div>
+              <div style="font-size:0.8rem; color:#1e6b3f; margin-top:4px;">Address: ${item.locality}, Kathmandu Valley</div>
+            </div>
           </div>
 
           <!-- Trust badges -->
@@ -640,7 +623,7 @@ function renderDetailPage(id) {
           </div>
 
           ${!State.memberLoggedIn ? `
-            <button class="btn btn-primary w-full" style="font-size:1rem;padding:14px" onclick="navigate('#/apply/${item.id}')">Apply Now - Unlock Details ${Icon.arrow}</button>
+            <button class="btn btn-primary w-full" style="font-size:1rem;padding:14px" onclick="navigate('#/apply/${item.id}')">Apply Now ${Icon.arrow}</button>
             <p style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-top:10px">Secure payment via eSewa / Khalti</p>
           ` : ''}
         </div>
@@ -2079,6 +2062,7 @@ window.renderMediaGallery = function (item, id) {
           ${isHls ? `<div class="hls-quality-badge" id="hls-quality-badge" style="display:none"></div>` : ''}
           <video
             id="detail-video-player"
+            crossorigin="anonymous"
             ${isHls ? '' : `src="${item.video_url}"`}
             controls
             playsinline
@@ -2553,9 +2537,11 @@ function attachHlsPlayer() {
   } else if (isHls && videoEl.canPlayType('application/vnd.apple.mpegurl')) {
     // Native HLS support (Safari/iOS) — just set src directly
     videoEl.src = videoUrl;
+    videoEl.load();
   } else if (!isHls) {
     // Plain mp4 fallback for old listings uploaded before HLS pipeline
     videoEl.src = videoUrl;
+    videoEl.load();
   }
 }
 
