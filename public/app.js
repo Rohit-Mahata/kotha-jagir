@@ -166,6 +166,8 @@ function renderNavbar() {
   <nav class="navbar" id="main-navbar">
     <div class="container navbar-inner">
       <a class="navbar-brand" href="#/" aria-label="Kotha Jagir Solution home">
+        <img src="logo.jpeg" alt="Kotha Jagir Logo" class="brand-logo" />
+        <span class="brand-name">Kotha Jagir<br>Solution</span>
       </a>
 
       <div class="navbar-tabs" role="tablist">
