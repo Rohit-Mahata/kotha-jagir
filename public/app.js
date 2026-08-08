@@ -203,10 +203,12 @@ function renderNavbar() {
   </nav>
 
   <!-- Mobile bottom nav tabs (Rooms / Jobs) -->
+  ${!State.route.startsWith('/admin') && !State.route.startsWith('/apply') ? `
   <div class="mobile-nav-tabs" role="tablist" aria-label="Browse mode">
     <button class="mobile-nav-tab ${State.mode === 'rooms' ? 'active' : ''}" onclick="setMode('rooms')" role="tab" aria-selected="${State.mode === 'rooms'}" id="mobile-tab-rooms">🏠 Rooms</button>
     <button class="mobile-nav-tab ${State.mode === 'jobs' ? 'active' : ''}" onclick="setMode('jobs')" role="tab" aria-selected="${State.mode === 'jobs'}" id="mobile-tab-jobs">💼 Jobs</button>
-  </div>`;
+  </div>
+  ` : ''}`;
 }
 
 function renderFooter() {
@@ -1175,7 +1177,7 @@ function renderAdminDashboard() {
     </div>
 
     <!-- Admin Content -->
-    <div style="flex:1;padding:32px 40px;overflow-x:hidden">
+    <div class="admin-content" style="flex:1;overflow-x:hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;flex-wrap:wrap;gap:12px">
         <div style="display:flex;align-items:center;gap:4px">
           <!-- Hamburger toggle (visible on mobile only) -->
@@ -1214,7 +1216,7 @@ function renderAdminRequests() {
   const rejected = State.applications ? State.applications.filter(a => a.status === 'rejected') : [];
 
   return `
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px">
+  <div class="admin-stats-grid">
     ${[['Pending Requests', pending.length, 'warning'], ['Approved Members', approved.length, 'success'], ['Rejected Trans', rejected.length, 'danger']].map(([label, count, type]) => `
       <div class="glass" style="border-radius:14px;padding:18px">
         <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:8px">${label}</div>
@@ -1233,7 +1235,7 @@ function renderAdminRequests() {
           <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No request records found</td></tr>
         ` : State.applications.map(app => `
           <tr>
-            <td><code style="font-size:0.8rem;font-family:monospace;background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px">${app.id}</code></td>
+            <td><code style="font-size:0.8rem;font-family:monospace;background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px;white-space:nowrap">${app.id}</code></td>
             <td style="font-weight:600">${app.name}</td>
             <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${app.listingTitle}</td>
             <td><span class="badge ${app.type === 'Room' ? 'badge-gold' : 'badge-outline'}">${app.type}</span></td>
@@ -1332,7 +1334,7 @@ function renderAdminApplications() {
         ` : apps.map(app => `
           <tr>
             <td>
-              <code style="font-size:0.78rem;font-family:monospace;background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px">${app.id}</code>
+              <code style="font-size:0.78rem;font-family:monospace;background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px;white-space:nowrap">${app.id}</code>
               <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${app.email}</div>
             </td>
             <td style="font-weight:600">${app.name}</td>

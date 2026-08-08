@@ -1641,13 +1641,14 @@ textarea.form-control {
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #F6F1EA;
+  background: #fff;
+  border: 1px solid rgba(200, 185, 175, 0.45);
+  color: var(--text-dark);
   cursor: pointer;
   flex-shrink: 0;
-  font-size: 1.1rem;
+  font-size: 1.3rem;
   margin-right: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 /* Admin sidebar overlay backdrop */
@@ -1777,8 +1778,14 @@ textarea.form-control {
 }
 
 .admin-content {
-  padding: 28px 32px;
+  padding: 32px 40px;
   overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .admin-content {
+    padding: 16px 12px;
+  }
 }
 
 /*  TABLE  */
@@ -2531,4 +2538,19 @@ textarea.form-control {
     padding-right: 24px;
   }
 }
+
+/* Admin stats cards grid wrapper */
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+@media (min-width: 600px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
 }
