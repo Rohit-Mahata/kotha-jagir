@@ -2065,7 +2065,6 @@ window.renderMediaGallery = function (item, id) {
           <video
             id="detail-video-player"
             crossorigin="anonymous"
-            ${isHls ? '' : `src="${item.video_url}"`}
             controls
             playsinline
             preload="metadata"
@@ -2075,6 +2074,14 @@ window.renderMediaGallery = function (item, id) {
             onloadeddata="document.getElementById('video-spinner').style.display='none'"
             onloadedmetadata="if(this.videoWidth>this.videoHeight){this.style.objectFit='contain';}else{this.style.objectFit='cover';} document.getElementById('video-spinner').style.display='none';"
           ></video>
+          ${isHls ? `
+          <div class="hls-quality-selector-container" id="hls-quality-selector-container">
+            <label for="hls-quality-selector">Quality</label>
+            <select id="hls-quality-selector">
+              <option value="-1">Auto</option>
+            </select>
+          </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -2473,78 +2480,122 @@ window.togglePasswordVisibility = function (id, btn) {
 // =============================================================================
 let _hlsInstance = null; // keep a reference to destroy on re-renders
 
+function setupQualitySelector(hls) {
+  const selector = document.getElementById('hls-quality-selector');
+  if (!selector) return;
+
+  // Clear existing options
+  selector.innerHTML = '';
+
+  // Add Auto option
+  const autoOpt = document.createElement('option');
+  autoOpt.value = '-1';
+  autoOpt.textContent = 'Auto';
+  selector.appendChild(autoOpt);
+
+  // Add options for each level
+  hls.levels.forEach((level, index) => {
+    const opt = document.createElement('option');
+    opt.value = index;
+    const heights = [360, 480, 720];
+    const h = level.height || heights[index] || `Level ${index}`;
+    opt.textContent = `${h}p`;
+    selector.appendChild(opt);
+  });
+
+  // Set the selected value to current level
+  selector.value = hls.currentLevel;
+
+  // Listen for changes
+  selector.onchange = (e) => {
+    const newLevel = parseInt(e.target.value, 10);
+    hls.currentLevel = newLevel;
+  };
+}
+
+function playHlsVideo(videoElement, url) {
+  if (!url) return;
+  
+  if (_hlsInstance) {
+    _hlsInstance.destroy();
+    _hlsInstance = null;
+  }
+
+  if (url.endsWith('.m3u8')) {
+    if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+      videoElement.src = url; // Safari native HLS support
+      videoElement.load();
+    } else if (window.Hls && Hls.isSupported()) {
+      const hls = new Hls({
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        abrEwmaDefaultEstimate: 500000,
+        startLevel: -1,
+        autoStartLoad: true,
+      });
+
+      hls.loadSource(url);
+      hls.attachMedia(videoElement);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        hls.currentLevel = 0; // default to lowest quality (360p)
+        document.getElementById('video-spinner') && (document.getElementById('video-spinner').style.display = 'none');
+        setupQualitySelector(hls);
+      });
+
+      hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+        const badge = document.getElementById('hls-quality-badge');
+        if (!badge) return;
+        const level = hls.levels[data.level];
+        if (level) {
+          const heights = [360, 480, 720];
+          const h = level.height || heights[data.level] || '?';
+          badge.textContent = `${h}p`;
+          badge.style.display = 'block';
+        }
+        const selector = document.getElementById('hls-quality-selector');
+        if (selector) {
+          selector.value = data.level;
+        }
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error('HLS playback error:', data);
+        if (data.fatal) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad();
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError();
+          } else {
+            hls.destroy();
+            _hlsInstance = null;
+          }
+        }
+      });
+
+      _hlsInstance = hls;
+    } else {
+      console.error('HLS not supported and hls.js failed to load.');
+    }
+  } else {
+    videoElement.src = url; // direct video file fallback (non-HLS upload path)
+    videoElement.load();
+  }
+}
+
 function attachHlsPlayer() {
   const videoEl = document.getElementById('detail-video-player');
   if (!videoEl) {
-    // No video in current view — destroy any old hls instance
     if (_hlsInstance) { _hlsInstance.destroy(); _hlsInstance = null; }
     return;
   }
 
-  // Find what video_url the active listing has
   const item = State.currentListing || State.adminPreviewListing;
   if (!item || !item.video_url) return;
 
   const videoUrl = item.video_url;
-  const isHls = videoUrl.endsWith('.m3u8');
-
-  // Destroy previous hls instance before attaching a new one
-  if (_hlsInstance) { _hlsInstance.destroy(); _hlsInstance = null; }
-
-  if (isHls && typeof Hls !== 'undefined' && Hls.isSupported()) {
-    const hls = new Hls({
-      maxBufferLength: 30,
-      maxMaxBufferLength: 60,
-      abrEwmaDefaultEstimate: 500000, // start conservative (500kbps)
-      startLevel: -1,                  // auto-select starting level
-      autoStartLoad: true,
-    });
-
-    hls.loadSource(videoUrl);
-    hls.attachMedia(videoEl);
-
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      // Don't autoplay — let user click play
-      document.getElementById('video-spinner') && (document.getElementById('video-spinner').style.display = 'none');
-    });
-
-    // Update quality badge when level switches
-    hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-      const badge = document.getElementById('hls-quality-badge');
-      if (!badge) return;
-      const level = hls.levels[data.level];
-      if (level) {
-        const heights = [360, 480, 720];
-        const h = level.height || heights[data.level] || '?';
-        badge.textContent = `${h}p`;
-        badge.style.display = 'block';
-      }
-    });
-
-    hls.on(Hls.Events.ERROR, (event, data) => {
-      if (data.fatal) {
-        console.warn('[HLS] Fatal error, recovering or destroying:', data);
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          hls.startLoad();
-        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-          hls.recoverMediaError();
-        } else {
-          hls.destroy();
-        }
-      }
-    });
-
-    _hlsInstance = hls;
-
-  } else if (isHls && videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-    // Native HLS support (Safari/iOS) — just set src directly
-    videoEl.src = videoUrl;
-    videoEl.load();
-  } else if (!isHls) {
-    // Plain mp4 fallback for old listings uploaded before HLS pipeline
-    videoEl.src = videoUrl;
-    videoEl.load();
-  }
+  
+  playHlsVideo(videoEl, videoUrl);
 }
 
 // Run application

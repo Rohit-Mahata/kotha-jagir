@@ -2554,3 +2554,41 @@ textarea.form-control {
     margin-bottom: 28px;
   }
 }
+
+/* HLS Quality Selector */
+.hls-quality-selector-container {
+  position: absolute;
+  bottom: 50px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.60);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-heading);
+  padding: 4px 9px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.hls-quality-selector-container select {
+  background: transparent;
+  color: #fff;
+  border: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-heading);
+  outline: none;
+  cursor: pointer;
+  padding-right: 4px;
+}
+
+.hls-quality-selector-container select option {
+  background: #111;
+  color: #fff;
+}

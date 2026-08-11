@@ -41,7 +41,7 @@ const ffmpegPath = require('ffmpeg-static');
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 const { pool, checkDatabaseConnection } = require('./db');
-const { checkR2Connection, uploadFile, uploadPublicFile, uploadPrivateFile, getPrivateFileUrl, getPublicUrl, getBucketUsage, deleteR2Object, deleteR2Folder, getKeyFromUrl } = require('./r2');
+const { checkR2Connection, uploadFile, uploadPublicFile, uploadPrivateFile, getPrivateFileUrl, getPublicUrl, getBucketUsage, deleteR2Object, deleteR2Folder, getKeyFromUrl, resizeImageBuffer } = require('./r2');
 const { checkResendConnection, sendOtpEmail } = require('./mailer');
 
 const app = express();
@@ -924,7 +924,8 @@ app.post('/api/admin/listings', authenticateAdmin, upload.fields([
     if (!coverPhoto) return res.status(400).json({ error: 'Cover photo is required' });
 
     const parsedAttr = JSON.parse(attributes || '{}');
-    const coverUrl = await uploadPublicFile(coverPhoto.buffer, `cover_${Date.now()}_${coverPhoto.originalname}`, coverPhoto.mimetype);
+    const coverResized = await resizeImageBuffer(coverPhoto.buffer);
+    const coverUrl = await uploadPublicFile(coverResized, `cover_${Date.now()}_${coverPhoto.originalname}`, coverPhoto.mimetype);
 
     let videoUrl = null;
     if (video) {
@@ -938,7 +939,8 @@ app.post('/api/admin/listings', authenticateAdmin, upload.fields([
 
     const galleryUrls = [];
     for (const file of galleryPhotos) {
-      const url = await uploadPublicFile(file.buffer, `gallery_${Date.now()}_${file.originalname}`, file.mimetype);
+      const fileResized = await resizeImageBuffer(file.buffer);
+      const url = await uploadPublicFile(fileResized, `gallery_${Date.now()}_${file.originalname}`, file.mimetype);
       galleryUrls.push(url);
     }
 
@@ -969,7 +971,8 @@ app.put('/api/admin/listings/:id', authenticateAdmin, upload.fields([
 
     let coverUrl = null;
     if (coverPhoto) {
-      coverUrl = await uploadPublicFile(coverPhoto.buffer, `cover_${Date.now()}_${coverPhoto.originalname}`, coverPhoto.mimetype);
+      const coverResized = await resizeImageBuffer(coverPhoto.buffer);
+      coverUrl = await uploadPublicFile(coverResized, `cover_${Date.now()}_${coverPhoto.originalname}`, coverPhoto.mimetype);
     }
 
     let videoUrl = null;
@@ -984,7 +987,8 @@ app.put('/api/admin/listings/:id', authenticateAdmin, upload.fields([
 
     const galleryUrls = [];
     for (const file of galleryPhotos) {
-      const url = await uploadPublicFile(file.buffer, `gallery_${Date.now()}_${file.originalname}`, file.mimetype);
+      const fileResized = await resizeImageBuffer(file.buffer);
+      const url = await uploadPublicFile(fileResized, `gallery_${Date.now()}_${file.originalname}`, file.mimetype);
       galleryUrls.push(url);
     }
 
@@ -1102,7 +1106,8 @@ app.patch('/api/admin/settings', authenticateAdmin, async (req, res) => {
 app.post('/api/admin/settings/qr-code', authenticateAdmin, upload.single('qr_code'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'File upload required' });
-    const qrUrl = await uploadPublicFile(req.file.buffer, `qr_${Date.now()}_${req.file.originalname}`, req.file.mimetype);
+    const qrResized = await resizeImageBuffer(req.file.buffer);
+    const qrUrl = await uploadPublicFile(qrResized, `qr_${Date.now()}_${req.file.originalname}`, req.file.mimetype);
 
     await pool.query(
       "INSERT INTO settings (key, value) VALUES ('payment_qr_code', $1::jsonb) " +

@@ -1,4 +1,5 @@
 const { S3Client, PutObjectCommand, ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
+const sharp = require('sharp');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
@@ -220,6 +221,26 @@ async function deleteR2Folder(prefix) {
   }
 }
 
+/**
+ * Resizes and compresses an image buffer using sharp.
+ * Defaults to max width 1600px, JPEG format with 78% quality.
+ * If sharp fails or image format is unsupported, falls back to original buffer.
+ * @param {Buffer} buffer - Original image buffer
+ * @param {number} maxWidth - Max width of resized image
+ * @returns {Promise<Buffer>} Resized/compressed image buffer, or original
+ */
+async function resizeImageBuffer(buffer, maxWidth = 1600) {
+  try {
+    return await sharp(buffer)
+      .resize({ width: maxWidth, withoutEnlargement: true })
+      .jpeg({ quality: 78 })
+      .toBuffer();
+  } catch (err) {
+    console.warn('[R2] Image resize failed, uploading original:', err.message);
+    return buffer; // fallback to original if not a supported image format
+  }
+}
+
 module.exports = {
   s3Client,
   uploadFile,
@@ -233,4 +254,5 @@ module.exports = {
   getKeyFromUrl,
   deleteR2Object,
   deleteR2Folder,
+  resizeImageBuffer,
 };
