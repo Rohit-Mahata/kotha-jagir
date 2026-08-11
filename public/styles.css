@@ -2035,8 +2035,11 @@ textarea.form-control {
 
 @media (max-width: 700px) {
   .footer-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 24px;
+  }
+  .footer-grid > div:first-child {
+    grid-column: 1 / -1;
   }
 }
 
@@ -2077,6 +2080,7 @@ textarea.form-control {
 .footer-links li {
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.7);
+  word-break: break-word;
 }
 
 .footer-links li a {
