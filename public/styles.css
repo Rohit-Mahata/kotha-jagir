@@ -2020,6 +2020,12 @@ textarea.form-control {
   background: rgba(43, 39, 36, 0.92);
 }
 
+@media (max-width: 768px) {
+  .footer {
+    padding-bottom: 96px; /* Avoid sticky bottom nav bar overlap */
+  }
+}
+
 .footer-grid {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
@@ -2038,13 +2044,15 @@ textarea.form-control {
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 1rem;
-  color: var(--text-dark);
+  color: #fff;
   margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .footer-desc {
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.7;
   max-width: 280px;
 }
@@ -2055,7 +2063,7 @@ textarea.form-control {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: var(--text-body);
+  color: #fff;
   margin-bottom: 12px;
 }
 
@@ -2066,9 +2074,14 @@ textarea.form-control {
   gap: 8px;
 }
 
+.footer-links li {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
 .footer-links li a {
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.7);
   transition: color var(--trans-fast);
 }
 
@@ -2081,14 +2094,14 @@ textarea.form-control {
   align-items: center;
   justify-content: space-between;
   padding-top: 20px;
-  border-top: 1px solid rgba(43, 39, 36, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   flex-wrap: wrap;
   gap: 10px;
 }
 
 .footer-copy {
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 /*  MISC UTILITIES  */
