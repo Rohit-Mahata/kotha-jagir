@@ -161,6 +161,11 @@ window.API = {
       method: 'PATCH',
     });
   },
+  async deleteApplication(id) {
+    return await apiFetch(`/api/admin/applications/${id}`, {
+      method: 'DELETE',
+    });
+  },
   async downloadApplicationPdf(id) {
     const blob = await apiFetch(`/api/admin/applications/${id}/pdf`);
     const downloadUrl = window.URL.createObjectURL(blob);

@@ -413,10 +413,23 @@ app.post('/api/applications', upload.fields([
       return res.status(400).json({ error: 'Both identity document front and back file images are required' });
     }
 
-    // Verify unique email across pending/active database records
-    const checkEmail = await pool.query('SELECT id FROM applications WHERE email = $1', [email]);
+    // Verify unique email across pending/active database records, but allow refilling if previous was rejected
+    const checkEmail = await pool.query('SELECT id, status, citizenship_front_url, citizenship_back_url FROM applications WHERE email = $1', [email]);
     if (checkEmail.rows.length > 0) {
-      return res.status(400).json({ error: 'An application is already registered under this email' });
+      const existingApp = checkEmail.rows[0];
+      if (existingApp.status === 'visitor_reverted') {
+        // Delete previous rejected application's identity proof documents from R2
+        if (existingApp.citizenship_front_url) {
+          await deleteR2Object(existingApp.citizenship_front_url);
+        }
+        if (existingApp.citizenship_back_url) {
+          await deleteR2Object(existingApp.citizenship_back_url);
+        }
+        // Delete old rejected record (associated notifications will cascade delete)
+        await pool.query('DELETE FROM applications WHERE id = $1', [existingApp.id]);
+      } else {
+        return res.status(400).json({ error: 'An application is already registered under this email' });
+      }
     }
 
     // Upload front/back images to private storage R2 bucket
@@ -788,6 +801,29 @@ app.patch('/api/admin/applications/:id/revoke', authenticateAdmin, async (req, r
       "UPDATE applications SET password_hash = NULL, access_revoked = TRUE, status = 'visitor_reverted' WHERE id = $1",
       [req.params.id]
     );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/applications/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const appId = req.params.id;
+    // 1. Fetch citizenship front/back urls to delete from R2
+    const result = await pool.query('SELECT citizenship_front_url, citizenship_back_url FROM applications WHERE id = $1', [appId]);
+    if (result.rows.length > 0) {
+      const { citizenship_front_url, citizenship_back_url } = result.rows[0];
+      if (citizenship_front_url) {
+        await deleteR2Object(citizenship_front_url);
+      }
+      if (citizenship_back_url) {
+        await deleteR2Object(citizenship_back_url);
+      }
+    }
+
+    // 2. Delete the application from database (notifications will cascade delete)
+    await pool.query('DELETE FROM applications WHERE id = $1', [appId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

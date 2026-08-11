@@ -788,7 +788,9 @@ function renderApplyFlow(listingId) {
             <ul style="font-size:0.85rem;line-height:1.7;padding-left:16px;color:var(--text-body);margin-bottom:16px;">
               <li>Account Owner: <strong>Kotha Jagir Solution Pvt Ltd</strong></li>
               <li>Scan the QR code and transfer the fee</li>
-              <li>Save a screenshot of your successful transaction</li>
+              <li>Take a screenshot of your successful QR payment</li>
+              <li>Share the payment proof screenshot on WhatsApp with us</li>
+              <li><em style="color:var(--accent-gold);">Note: If your application is rejected, you will be allowed to refill the form and try again.</em></li>
             </ul>
             <div class="form-group">
               <label for="ap-pass" style="font-weight:700">Set Account Password <span class="required">*</span></label>
@@ -1242,11 +1244,12 @@ function renderAdminRequests() {
             <td style="color:var(--text-muted);font-size:0.8rem">${app.timestamp}</td>
             <td><span class="status-badge ${app.status}" style="font-size:0.72rem">${app.status}</span></td>
             <td>
-              <div style="display:flex;gap:6px">
+              <div style="display:flex;gap:6px;align-items:center;">
                 ${app.status === 'pending' ? `
                   <button class="btn btn-success btn-sm" onclick="approveApp('${app.id}')" aria-label="Approve ${app.id}">Approve</button>
                   <button class="btn btn-danger btn-sm" onclick="rejectApp('${app.id}')" aria-label="Reject ${app.id}">Reject</button>
                 ` : `<span style="font-size:0.8rem;color:var(--text-muted)">Done</span>`}
+                <button class="btn btn-ghost btn-icon" style="color:var(--danger)" title="Delete Request" onclick="deleteApplication('${app.id}')" aria-label="Delete request ${app.id}">${Icon.trash}</button>
               </div>
             </td>
           </tr>
@@ -1350,12 +1353,13 @@ function renderAdminApplications() {
               `}
             </td>
             <td>
-              <div style="display:flex;gap:5px">
+              <div style="display:flex;gap:5px;align-items:center;">
                 <button class="btn btn-ghost btn-icon" title="View details & Citizenship cards" onclick="openAppModal('${app.id}')" aria-label="Open application ${app.id}">${Icon.eye}</button>
                 <button class="btn btn-ghost btn-icon" title="Download PDF" onclick="downloadPDF('${app.id}')" aria-label="Download PDF for ${app.id}">${Icon.download}</button>
                 ${!app.accessRevoked ? `
                   <button class="btn btn-ghost btn-sm" style="font-size:0.72rem;color:var(--danger)" title="Revoke member login access" onclick="revokeAccess('${app.id}')">Revoke Access</button>
                 ` : ''}
+                <button class="btn btn-ghost btn-icon" style="color:var(--danger)" title="Delete Application" onclick="deleteApplication('${app.id}')" aria-label="Delete application ${app.id}">${Icon.trash}</button>
               </div>
             </td>
           </tr>
@@ -1975,6 +1979,20 @@ window.revokeAccess = async function (id) {
     await API.revokeApplicationAccess(id);
     showToast(`Revoked Member credentials for application ${id}`, 'warning');
     State.applications = null;
+    render();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.deleteApplication = async function (id) {
+  if (!confirm('Are you sure you want to permanently delete this application record and all its files? This action cannot be undone.')) {
+    return;
+  }
+  try {
+    await API.deleteApplication(id);
+    showToast(`Permanently deleted application ${id}`, 'success');
+    State.applications = null; // reload list
     render();
   } catch (err) {
     showToast(err.message, 'error');
