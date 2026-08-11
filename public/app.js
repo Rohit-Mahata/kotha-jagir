@@ -778,14 +778,14 @@ function renderApplyFlow(listingId) {
           To verify your profile and listing connection, please make a payment of <strong>Rs. 500</strong>. This helps prevent spam listings and supports administrative checkups.
         </p>
 
-        <div style="display:grid;grid-template-columns:220px 1fr;gap:20px;background:#fff;padding:20px;border-radius:12px;border:1px solid rgba(0,0,0,0.06);margin-bottom:20px">
-          <div style="text-align:center">
-            <img src="${State.adminQrCode || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400&q=80'}" alt="Payment QR Code" style="width:180px;height:180px;object-fit:contain;border:1px solid #ddd;border-radius:8px;" />
-            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px">eSewa / Khalti scan QR</div>
+        <div class="payment-wizard-grid">
+          <div class="payment-qr-container">
+            <img src="${State.adminQrCode || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400&q=80'}" alt="Payment QR Code" />
+            <div class="payment-qr-label">eSewa / Khalti scan QR</div>
           </div>
-          <div>
+          <div class="payment-details-container">
             <h4 style="margin-bottom:8px">Payment details</h4>
-            <ul style="font-size:0.85rem;line-height:1.7;padding-left:16px;color:var(--text-body);">
+            <ul style="font-size:0.85rem;line-height:1.7;padding-left:16px;color:var(--text-body);margin-bottom:16px;">
               <li>Account Owner: <strong>Kotha Jagir Solution Pvt Ltd</strong></li>
               <li>Scan the QR code and transfer the fee</li>
               <li>Save a screenshot of your successful transaction</li>

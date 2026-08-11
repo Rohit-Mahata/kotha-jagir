@@ -2592,3 +2592,62 @@ textarea.form-control {
   background: #111;
   color: #fff;
 }
+
+/* Payment Wizard Grid & Layout */
+.payment-wizard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.06);
+  margin-bottom: 20px;
+}
+
+.payment-qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.payment-qr-container img {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fdfdfd;
+}
+
+.payment-qr-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+.payment-details-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.payment-details-container h4 {
+  font-family: var(--font-heading);
+  color: var(--text-dark);
+  font-size: 1.05rem;
+}
+
+/* On screens larger than 520px, display side-by-side */
+@media (min-width: 520px) {
+  .payment-wizard-grid {
+    grid-template-columns: 200px 1fr;
+    gap: 24px;
+  }
+  
+  .payment-qr-container {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
