@@ -2126,11 +2126,6 @@ window.submitGharJaggaInquiry = async function (e, listingId) {
     State.inquirySubmitted = listingId;
     showToast('Inquiry submitted successfully!');
     render();
-
-    // Redirect to WhatsApp
-    const item = State.currentListing;
-    const message = `Hi, I'm interested in the land/house listing "${item.title}" (${item.locality}). I just submitted an inquiry form. Could you share the rate and further details?`;
-    window.open(`https://wa.me/${State.adminWhatsapp}?text=${encodeURIComponent(message)}`, '_blank');
   } catch (err) {
     showToast(`Inquiry submission failed: ${err.message}`, 'error');
     if (btn) {
