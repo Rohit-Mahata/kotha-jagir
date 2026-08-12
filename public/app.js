@@ -679,10 +679,12 @@ function renderDetailPage(id) {
                     <span><strong>Floors:</strong> ${item.attributes.houseFloors}</span>
                   </div>
                 ` : ''}
-                <div class="amenity-item">
-                  <span class="amenity-icon">🚗</span>
-                  <span><strong>Parking:</strong> ${item.attributes?.parking ? 'Available' : 'Not Available'}</span>
-                </div>
+                ${(item.type === 'house' && item.attributes?.parking !== undefined) ? `
+                  <div class="amenity-item">
+                    <span class="amenity-icon">🚗</span>
+                    <span><strong>Parking:</strong> ${item.attributes.parking ? 'Available' : 'Not Available'}</span>
+                  </div>
+                ` : ''}
               </div>
             ` : `
               <div class="amenities-grid">
@@ -1754,12 +1756,12 @@ function renderCreateModal() {
               <label for="lc-jobtype">Job Type</label>
               <select id="lc-jobtype" class="form-control">${JOB_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}</select>
             </div>
-          ` : `
+          ` : (isRoom || isHouse) ? `
             <div class="form-group">
               <label for="lc-parking">Parking</label>
               <select id="lc-parking" class="form-control"><option value="Yes">Yes</option><option value="No">No</option></select>
             </div>
-          `}
+          ` : ''}
           ${(isLand || isHouse) ? `
             <div class="form-group">
               <label for="lc-landarea">Land Area (e.g. 4 Aana, 1 Ropani)</label>
@@ -2535,11 +2537,11 @@ window.publishListing = async function () {
       attributes.requirements = checkedAmenities;
     } else {
       // Land or House
-      const parkingVal = document.getElementById('lc-parking').value;
-      attributes.parking = parkingVal === 'Yes';
       attributes.landArea = document.getElementById('lc-landarea').value.trim();
       attributes.roadAccess = document.getElementById('lc-roadaccess').value.trim();
       if (type === 'house') {
+        const parkingVal = document.getElementById('lc-parking').value;
+        attributes.parking = parkingVal === 'Yes';
         attributes.houseFloors = document.getElementById('lc-housefloors').value.trim();
       }
     }
