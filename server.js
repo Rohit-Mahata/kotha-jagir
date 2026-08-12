@@ -334,7 +334,7 @@ app.get('/api/listings', async (req, res) => {
       furnished: l.attributes?.furnished,
       experience: l.attributes?.experience,
       jobType: l.attributes?.jobType,
-      images: [l.cover_photo_url, ...(l.gallery_photo_urls || [])],
+      images: [l.cover_photo_url, ...(l.gallery_photo_urls || [])].filter(Boolean),
       postedDate: new Date(l.created_at).toISOString().split('T')[0],
       desc: l.description,
       amenities: l.attributes?.amenities || [],
@@ -395,7 +395,7 @@ app.get('/api/listings/:id', async (req, res) => {
       furnished: l.attributes?.furnished,
       experience: l.attributes?.experience,
       jobType: l.attributes?.jobType,
-      images: [l.cover_photo_url, ...(l.gallery_photo_urls || [])],
+      images: [l.cover_photo_url, ...(l.gallery_photo_urls || [])].filter(Boolean),
       postedDate: new Date(l.created_at).toISOString().split('T')[0],
       desc: l.description,
       amenities: l.attributes?.amenities || [],
@@ -967,11 +967,12 @@ app.post('/api/admin/listings', authenticateAdmin, upload.fields([
     const video = req.files?.video?.[0];
     const galleryPhotos = req.files?.gallery_photos || [];
 
-    if (!coverPhoto) return res.status(400).json({ error: 'Cover photo is required' });
-
     const parsedAttr = JSON.parse(attributes || '{}');
-    const coverResized = await resizeImageBuffer(coverPhoto.buffer);
-    const coverUrl = await uploadPublicFile(coverResized, `cover_${Date.now()}_${coverPhoto.originalname}`, coverPhoto.mimetype);
+    let coverUrl = null;
+    if (coverPhoto) {
+      const coverResized = await resizeImageBuffer(coverPhoto.buffer);
+      coverUrl = await uploadPublicFile(coverResized, `cover_${Date.now()}_${coverPhoto.originalname}`, coverPhoto.mimetype);
+    }
 
     let videoUrl = null;
     if (video) {

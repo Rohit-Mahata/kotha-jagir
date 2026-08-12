@@ -1765,8 +1765,8 @@ function renderCreateModal() {
         </div>
 
         <div class="form-group">
-          <label for="lc-cover">Cover Photo Upload <span class="required">*</span></label>
-          <input type="file" id="lc-cover" class="form-control" accept="image/*" required />
+          <label for="lc-cover">Cover Photo Upload (Optional)</label>
+          <input type="file" id="lc-cover" class="form-control" accept="image/*" />
         </div>
 
         <div class="form-group">
@@ -2481,8 +2481,8 @@ window.publishListing = async function () {
   const type = State.adminListingTab; // 'room' | 'job' | 'land' | 'house'
   const isRoomOrJob = type === 'room' || type === 'job';
 
-  if (!title || (!price && isRoomOrJob) || !coverFile) {
-    showToast('Please specify all required fields (Title, Price/Salary, and Cover Photo)', 'error');
+  if (!title || (!price && isRoomOrJob)) {
+    showToast('Please specify all required fields (Title and Price/Salary)', 'error');
     return;
   }
 
@@ -2531,7 +2531,9 @@ window.publishListing = async function () {
     }
 
     form.append('attributes', JSON.stringify(attributes));
-    form.append('cover_photo', coverFile);
+    if (coverFile) {
+      form.append('cover_photo', coverFile);
+    }
     for (let i = 0; i < galleryFiles.length; i++) {
       form.append('gallery_photos', galleryFiles[i]);
     }
