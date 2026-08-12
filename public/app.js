@@ -2764,6 +2764,7 @@ async function initializeApp() {
 }
 
 // // MAIN RENDER ROUTE BOOTSTRAP //"""""""""""""""""""""""""""""
+let lastHash = null;
 function render() {
   const app = document.getElementById('app');
   if (!app) return;
@@ -2828,7 +2829,12 @@ function render() {
   }
 
   app.innerHTML = html;
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  
+  const currentHash = location.hash || '#/';
+  if (lastHash !== currentHash) {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    lastHash = currentHash;
+  }
 
   // Attach hls.js to video element after render if needed
   attachHlsPlayer();
