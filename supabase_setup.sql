@@ -50,6 +50,14 @@ CREATE TABLE IF NOT EXISTS job_categories (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 5.5 ROOM FEATURES TABLE (Admin-Managed)
+CREATE TABLE IF NOT EXISTS room_features (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT UNIQUE NOT NULL,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- 6. LISTINGS TABLE
 CREATE TABLE IF NOT EXISTS listings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -176,6 +184,20 @@ ON CONFLICT (name) DO NOTHING;
 INSERT INTO settings (key, value) VALUES
 ('storage_usage', '{"used_gb": 6.2, "total_gb": 10.0}'::jsonb)
 ON CONFLICT (key) DO NOTHING;
+
+-- Seed Room Features
+INSERT INTO room_features (name) VALUES
+('Wifi'),
+('Parking'),
+('Furnished'),
+('Water Supply'),
+('Electricity Backup'),
+('CCTV'),
+('Elevator'),
+('Balcony'),
+('Kitchen'),
+('AC')
+ON CONFLICT (name) DO NOTHING;
 
 -- Done!
 SELECT 'Supabase schema migration and seed successfully created!' AS result;

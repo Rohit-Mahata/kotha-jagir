@@ -13,6 +13,7 @@ const State = {
   localities: [],
   jobCategories: [],
   roomTypes: [],
+  roomFeatures: [],
   adminWhatsapp: '9779841234567',
   adminQrCode: '',
   storageUsedGB: 0.0,
@@ -452,10 +453,11 @@ function renderHomePage() {
   if (State.listings === null && !State.loading['listings'] && !State.errors['listings']) {
     State.loading['listings'] = true;
     const filters = State.mode === 'rooms' ? State.roomFilters : (State.mode === 'jobs' ? State.jobFilters : State.gharJaggaFilters);
+    const { type: filterType, ...restFilters } = filters;
     let fetchType = 'room';
     if (State.mode === 'jobs') fetchType = 'job';
-    else if (State.mode === 'ghar-jagga') fetchType = State.gharJaggaFilters?.type || 'ghar-jagga';
-    API.getListings({ type: fetchType, ...filters })
+    else if (State.mode === 'ghar-jagga') fetchType = filterType || 'ghar-jagga';
+    API.getListings({ type: fetchType, ...restFilters })
       .then(res => {
         State.listings = res;
         State.loading['listings'] = false;
@@ -1595,6 +1597,23 @@ function renderAdminCategories() {
         `).join('')}
       </div>
     </div>
+
+    <!-- Manage Room Features -->
+    <div class="glass" style="border-radius:16px;padding:24px">
+      <h3 style="margin-bottom:6px">✨ Manage Room Features</h3>
+      <form onsubmit="event.preventDefault(); const inp=document.getElementById('new-rfeature-input'); addRoomFeature(inp.value); inp.value='';" style="display:flex;gap:8px;margin-bottom:18px">
+        <input id="new-rfeature-input" class="form-control" type="text" placeholder="e.g. Swimming Pool" required style="font-size:0.85rem;" />
+        <button type="submit" class="btn btn-primary btn-sm">+ Add Feature</button>
+      </form>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;max-height:280px;overflow-y:auto;padding-right:4px">
+        ${State.roomFeatures.map(rf => `
+          <div class="badge badge-gold" style="padding:6px 12px;font-size:0.82rem;display:flex;align-items:center;gap:6px;background:rgba(212,162,76,0.1);color:#a87d2a;border-color:rgba(212,162,76,0.3)">
+            <span>${rf}</span>
+            <button type="button" onclick="deleteRoomFeature('${rf}')" style="color:var(--danger);font-weight:bold;cursor:pointer;background:none;border:none;padding:0 2px" title="Delete feature">&times;</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1783,7 +1802,7 @@ function renderCreateModal() {
           <div class="form-group">
             <label style="color:var(--text-body);font-weight:600;">${isRoom ? 'Features' : 'Requirements'}</label>
             <div style="display:flex;flex-wrap:wrap;gap:8px">
-              ${(isRoom ? AMENITIES_LIST : JOB_REQUIREMENTS).map(a => `
+              ${(isRoom ? State.roomFeatures : JOB_REQUIREMENTS).map(a => `
                 <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;cursor:pointer;padding:4px 10px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,0.06)">
                   <input type="checkbox" name="lc-amenity" value="${a}" /> ${amenityIcon(a)} ${a}
                 </label>
@@ -2653,6 +2672,29 @@ window.deleteRoomType = async function (name) {
   }
 };
 
+window.addRoomFeature = async function (name) {
+  if (!name.trim()) return;
+  try {
+    await API.addRoomFeature(name.trim());
+    State.roomFeatures.push(name.trim());
+    showToast(`Added room feature: ${name}`);
+    render();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.deleteRoomFeature = async function (name) {
+  try {
+    await API.deleteRoomFeature(name);
+    State.roomFeatures = State.roomFeatures.filter(rf => rf !== name);
+    showToast(`Removed room feature: ${name}`, 'warning');
+    render();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
 // Push alert actions
 window.blockPush = function () {
   const prompt = document.getElementById('push-prompt');
@@ -2684,10 +2726,11 @@ window.enablePush = async function () {
 let isInitialized = false;
 async function initializeApp() {
   try {
-    const [localities, roomTypes, jobCategories, waRes, qrRes] = await Promise.all([
+    const [localities, roomTypes, jobCategories, roomFeatures, waRes, qrRes] = await Promise.all([
       API.getLocalities().catch(() => []),
       API.getRoomTypes().catch(() => []),
       API.getJobCategories().catch(() => []),
+      API.getRoomFeatures().catch(() => []),
       API.getAdminWhatsappNumber().catch(() => ({ whatsapp_number: '9779841234567' })),
       API.getAdminQrCode().catch(() => ({ qr_code: '' }))
     ]);
@@ -2695,6 +2738,7 @@ async function initializeApp() {
     State.localities = localities;
     State.roomTypes = roomTypes;
     State.jobCategories = jobCategories;
+    State.roomFeatures = roomFeatures;
     State.adminWhatsapp = waRes.whatsapp_number;
     State.adminQrCode = qrRes.qr_code;
 

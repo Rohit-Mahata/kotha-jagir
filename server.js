@@ -222,6 +222,15 @@ app.get('/api/job-categories', async (req, res) => {
   }
 });
 
+app.get('/api/room-features', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT name FROM room_features WHERE active = true ORDER BY name ASC');
+    res.json(result.rows.map(r => r.name));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/settings/whatsapp-number', async (req, res) => {
   try {
     const result = await pool.query("SELECT value FROM settings WHERE key = 'whatsapp_number'");
@@ -1231,6 +1240,25 @@ app.post('/api/admin/room-types', authenticateAdmin, async (req, res) => {
 app.delete('/api/admin/room-types/:name', authenticateAdmin, async (req, res) => {
   try {
     await pool.query('DELETE FROM room_types WHERE name = $1', [req.params.name]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/room-features', authenticateAdmin, async (req, res) => {
+  const { name } = req.body;
+  try {
+    await pool.query('INSERT INTO room_features (name) VALUES ($1) ON CONFLICT DO NOTHING', [name]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/room-features/:name', authenticateAdmin, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM room_features WHERE name = $1', [req.params.name]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

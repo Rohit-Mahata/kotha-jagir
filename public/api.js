@@ -59,6 +59,9 @@ window.API = {
   async getJobCategories() {
     return await apiFetch('/api/job-categories');
   },
+  async getRoomFeatures() {
+    return await apiFetch('/api/room-features');
+  },
 
   // --- SETTINGS ---
   async getAdminWhatsappNumber() {
@@ -256,6 +259,17 @@ window.API = {
   },
   async deleteRoomType(name) {
     return await apiFetch(`/api/admin/room-types/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    });
+  },
+  async addRoomFeature(name) {
+    return await apiFetch('/api/admin/room-features', {
+      method: 'POST',
+      body: { name },
+    });
+  },
+  async deleteRoomFeature(name) {
+    return await apiFetch(`/api/admin/room-features/${encodeURIComponent(name)}`, {
       method: 'DELETE',
     });
   },
