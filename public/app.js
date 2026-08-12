@@ -22,11 +22,13 @@ const State = {
   listings: null,      // null = loading
   applications: null,  // null = loading
   notifications: null, // null = loading
+  inquiries: null,     // null = loading
   currentListing: null,// null = loading
 
   // Filter forms
   roomFilters: { locality: '', budget: 35000, roomType: '', parking: 'any', suitableFor: '' },
   jobFilters: { locality: '', salary: 60000, category: '', jobType: '', experience: '' },
+  gharJaggaFilters: { locality: '', category: '', type: '' },
 
   // Auth Status
   memberLoggedIn: false,
@@ -86,6 +88,11 @@ function parseRoute() {
     if (segments[1]) params.id = segments[1];
     if (segments[2]) params.sub = segments[2];
     return { path: '/jobs', params, full: hash };
+  }
+  if (segments[0] === 'ghar-jagga') {
+    if (segments[1]) params.id = segments[1];
+    if (segments[2]) params.sub = segments[2];
+    return { path: '/ghar-jagga', params, full: hash };
   }
   if (segments[0] === 'apply') {
     if (segments[1]) params.id = segments[1];
@@ -173,6 +180,7 @@ function renderNavbar() {
       <div class="navbar-tabs" role="tablist">
         <button class="nav-tab ${State.mode === 'rooms' ? 'active' : ''}" onclick="setMode('rooms')" role="tab" aria-selected="${State.mode === 'rooms'}">Rooms</button>
         <button class="nav-tab ${State.mode === 'jobs' ? 'active' : ''}" onclick="setMode('jobs')" role="tab" aria-selected="${State.mode === 'jobs'}">Jobs</button>
+        <button class="nav-tab ${State.mode === 'ghar-jagga' ? 'active' : ''}" onclick="setMode('ghar-jagga')" role="tab" aria-selected="${State.mode === 'ghar-jagga'}">Ghar/Jagga</button>
       </div>
 
       <div class="navbar-right">
@@ -202,11 +210,12 @@ function renderNavbar() {
     </div>
   </nav>
 
-  <!-- Mobile bottom nav tabs (Rooms / Jobs) -->
+  <!-- Mobile bottom nav tabs (Rooms / Jobs / Ghar/Jagga) -->
   ${!State.route.startsWith('/admin') && !State.route.startsWith('/apply') ? `
   <div class="mobile-nav-tabs" role="tablist" aria-label="Browse mode">
     <button class="mobile-nav-tab ${State.mode === 'rooms' ? 'active' : ''}" onclick="setMode('rooms')" role="tab" aria-selected="${State.mode === 'rooms'}" id="mobile-tab-rooms">🏠 Rooms</button>
     <button class="mobile-nav-tab ${State.mode === 'jobs' ? 'active' : ''}" onclick="setMode('jobs')" role="tab" aria-selected="${State.mode === 'jobs'}" id="mobile-tab-jobs">💼 Jobs</button>
+    <button class="mobile-nav-tab ${State.mode === 'ghar-jagga' ? 'active' : ''}" onclick="setMode('ghar-jagga')" role="tab" aria-selected="${State.mode === 'ghar-jagga'}" id="mobile-tab-ghar-jagga">🏡 Ghar/Jagga</button>
   </div>
   ` : ''}`;
 }
@@ -257,6 +266,8 @@ function renderFooter() {
 
 function renderFilterBar() {
   const isJobs = State.mode === 'jobs';
+  const isGharJagga = State.mode === 'ghar-jagga';
+  
   if (isJobs) {
     const f = State.jobFilters;
     return `
@@ -296,6 +307,37 @@ function renderFilterBar() {
           </select>
         </div>
         <button class="filter-clear" onclick="clearJobFilters()">Clear All</button>
+      </div>
+    </div>`;
+  } else if (isGharJagga) {
+    const f = State.gharJaggaFilters || { locality: '', category: '', type: '' };
+    return `
+    <div class="filter-bar-wrap container">
+      <div class="filter-bar glass">
+        <div class="filter-group">
+          <label for="gjf-loc">Location</label>
+          <select id="gjf-loc" class="filter-select" onchange="updateGharJaggaFilter('locality', this.value)">
+            <option value="">All Areas</option>
+            ${State.localities.map(l => `<option value="${l}" ${f.locality === l ? 'selected' : ''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="gjf-cat">Category</label>
+          <select id="gjf-cat" class="filter-select" onchange="updateGharJaggaFilter('category', this.value)">
+            <option value="">All (Sale/Rent)</option>
+            <option value="For Sale" ${f.category === 'For Sale' ? 'selected' : ''}>For Sale</option>
+            <option value="For Rent" ${f.category === 'For Rent' ? 'selected' : ''}>For Rent</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="gjf-type">Type</label>
+          <select id="gjf-type" class="filter-select" onchange="updateGharJaggaFilter('type', this.value)">
+            <option value="">Land & House</option>
+            <option value="land" ${f.type === 'land' ? 'selected' : ''}>Land Only</option>
+            <option value="house" ${f.type === 'house' ? 'selected' : ''}>House Only</option>
+          </select>
+        </div>
+        <button class="filter-clear" onclick="clearGharJaggaFilters()">Clear All</button>
       </div>
     </div>`;
   } else {
@@ -343,8 +385,18 @@ function renderFilterBar() {
 
 function renderListingCard(item) {
   const isRoom = item.type === 'room';
-  const detailRoute = isRoom ? `#/room/${item.id}` : `#/jobs/${item.id}`;
-  const bookedRoute = isRoom ? `#/room/${item.id}/booked` : `#/jobs/${item.id}/filled`;
+  const isJob = item.type === 'job';
+  const isGharJagga = item.type === 'land' || item.type === 'house';
+
+  let detailRoute = '';
+  if (isRoom) detailRoute = `#/room/${item.id}`;
+  else if (isJob) detailRoute = `#/jobs/${item.id}`;
+  else if (isGharJagga) detailRoute = `#/ghar-jagga/${item.id}`;
+
+  let bookedRoute = '';
+  if (isRoom) bookedRoute = `#/room/${item.id}/booked`;
+  else if (isJob) bookedRoute = `#/jobs/${item.id}/filled`;
+  else if (isGharJagga) bookedRoute = `#/ghar-jagga/${item.id}/booked`;
 
   return `
   <div class="listing-card" tabindex="${item.booked ? '-1' : '0'}" 
@@ -358,25 +410,34 @@ function renderListingCard(item) {
     </div>
     <div class="card-body">
       <div class="card-title">${item.title}</div>
-      <div class="card-price">${item.priceLabel || item.salaryLabel} <span>${isRoom ? '/month' : item.jobType ? ` ${item.jobType}` : ''}</span></div>
+      <div class="card-price">
+        ${isGharJagga ? `<span style="font-size:0.85rem;color:var(--primary);font-weight:600;">Contact admin for rate details</span>` : `
+          ${item.priceLabel || item.salaryLabel} <span>${isRoom ? '/month' : item.jobType ? ` ${item.jobType}` : ''}</span>
+        `}
+      </div>
       <div class="card-badges">
         ${isRoom ? `
           ${item.furnished ? `<span class="badge badge-outline">Furnished</span>` : ''}
           ${item.parking ? `<span class="badge badge-outline">Parking</span>` : ''}
           ${item.suitableFor ? `<span class="badge badge-gold">${item.suitableFor}</span>` : ''}
-        ` : `
+        ` : isJob ? `
           <span class="badge badge-outline">${item.experience} Level</span>
           <span class="badge badge-gold">${item.jobType}</span>
+        ` : `
+          <span class="badge badge-gold" style="text-transform: capitalize;">${item.type}</span>
+          ${item.attributes?.landArea ? `<span class="badge badge-outline">${item.attributes.landArea}</span>` : ''}
+          ${item.attributes?.roadAccess ? `<span class="badge badge-outline">${item.attributes.roadAccess}</span>` : ''}
+          ${item.attributes?.houseFloors ? `<span class="badge badge-outline">${item.attributes.houseFloors} Floors</span>` : ''}
         `}
       </div>
       <div class="card-footer-row">
         <span style="font-size:0.75rem;color:var(--text-muted)">Posted ${item.postedDate}</span>
-        <span class="card-cta">${isRoom ? 'View Room' : 'View Job'} ${Icon.arrow}</span>
+        <span class="card-cta">${isRoom ? 'View Room' : isJob ? 'View Job' : 'View Details'} ${Icon.arrow}</span>
       </div>
     </div>
     ${item.booked ? `
-      <div class="card-booked-overlay" onclick="navigate('${bookedRoute}')" style="cursor:pointer" role="link" tabindex="0" aria-label="${isRoom ? 'Already booked' : 'Position filled'}">
-        <div class="booked-label">${isRoom ? "Already Booked" : "Position Filled"}</div>
+      <div class="card-booked-overlay" onclick="navigate('${bookedRoute}')" style="cursor:pointer" role="link" tabindex="0" aria-label="${isRoom ? 'Already booked' : isJob ? 'Position filled' : 'Already Booked'}">
+        <div class="booked-label">${isRoom ? "Already Booked" : isJob ? "Position Filled" : "Already Booked"}</div>
         <div class="booked-sub">Tap to view details</div>
       </div>
     ` : ''}
@@ -390,8 +451,11 @@ function renderHomePage() {
   // Trigger listings fetch
   if (State.listings === null && !State.loading['listings'] && !State.errors['listings']) {
     State.loading['listings'] = true;
-    const filters = State.mode === 'rooms' ? State.roomFilters : State.jobFilters;
-    API.getListings({ type: State.mode === 'rooms' ? 'room' : 'job', ...filters })
+    const filters = State.mode === 'rooms' ? State.roomFilters : (State.mode === 'jobs' ? State.jobFilters : State.gharJaggaFilters);
+    let fetchType = 'room';
+    if (State.mode === 'jobs') fetchType = 'job';
+    else if (State.mode === 'ghar-jagga') fetchType = State.gharJaggaFilters?.type || 'ghar-jagga';
+    API.getListings({ type: fetchType, ...filters })
       .then(res => {
         State.listings = res;
         State.loading['listings'] = false;
@@ -405,6 +469,7 @@ function renderHomePage() {
   }
 
   const isJobs = State.mode === 'jobs';
+  const isGharJagga = State.mode === 'ghar-jagga';
   let bodyContentHtml = '';
 
   if (State.loading['listings']) {
@@ -428,9 +493,9 @@ function renderHomePage() {
           <div style="font-size:3rem; margin-bottom:12px;">🔍</div>
           <div class="empty-state-text" style="font-size:1.2rem; font-weight:600; color:var(--text-dark);">No active listings found</div>
           <p style="color:var(--text-muted); font-size:0.88rem; margin-top:8px; max-width:400px; margin-left:auto; margin-right:auto;">
-            We couldn't find any ${isJobs ? 'jobs' : 'rooms'} matching your settings. Check back later or try clearing your filters.
+            We couldn't find any ${isJobs ? 'jobs' : isGharJagga ? 'properties' : 'rooms'} matching your settings. Check back later or try clearing your filters.
           </p>
-          <button class="btn btn-outline" style="margin-top:20px" onclick="${isJobs ? 'clearJobFilters()' : 'clearRoomFilters()'}">Clear Filters</button>
+          <button class="btn btn-outline" style="margin-top:20px" onclick="${isJobs ? 'clearJobFilters()' : isGharJagga ? 'clearGharJaggaFilters()' : 'clearRoomFilters()'}">Clear Filters</button>
         </div>
       </div>
     `;
@@ -438,10 +503,10 @@ function renderHomePage() {
     bodyContentHtml = `
       <div class="container listings-section">
         <div class="section-header">
-          <h2>${isJobs ? "Job Listings" : "Room & Flat Listings"}</h2>
+          <h2>${isJobs ? "Job Listings" : isGharJagga ? "Ghar / Jagga (Land & House)" : "Room & Flat Listings"}</h2>
           <div style="display:flex;gap:10px;align-items:center">
             <span class="results-count">${State.listings.filter(i => !i.booked).length} active</span>
-            ${State.listings.filter(i => i.booked).length > 0 ? `<span class="results-count" style="background:rgba(178,58,58,0.08);border-color:rgba(178,58,58,0.2);color:var(--danger)">${State.listings.filter(i => i.booked).length} filled</span>` : ''}
+            ${State.listings.filter(i => i.booked).length > 0 ? `<span class="results-count" style="background:rgba(178,58,58,0.08);border-color:rgba(178,58,58,0.2);color:var(--danger)">${State.listings.filter(i => i.booked).length} booked</span>` : ''}
           </div>
         </div>
         <div class="listings-grid">${State.listings.map(renderListingCard).join('')}</div>
@@ -551,6 +616,8 @@ function renderDetailPage(id) {
   if (!item) return renderNotFound();
 
   const isRoom = item.type === 'room';
+  const isJob = item.type === 'job';
+  const isGharJagga = item.type === 'land' || item.type === 'house';
 
   return `
   ${renderNavbar()}
@@ -574,28 +641,59 @@ function renderDetailPage(id) {
                 <div style="font-size:0.82rem;color:var(--text-muted)">Posted ${item.postedDate}</div>
               </div>
               <div>
-                <div style="font-family:var(--font-heading);font-size:1.8rem;font-weight:700;color:var(--primary)">${item.priceLabel || item.salaryLabel}</div>
-                <div style="font-size:0.8rem;color:var(--text-muted);text-align:right">${isRoom ? 'per month' : item.jobType}</div>
+                ${isGharJagga ? `
+                  <div style="font-family:var(--font-heading);font-size:1.25rem;font-weight:700;color:var(--primary);text-align:right">Contact For Rate</div>
+                  <div style="font-size:0.8rem;color:var(--text-muted);text-align:right">Rate on request</div>
+                ` : `
+                  <div style="font-family:var(--font-heading);font-size:1.8rem;font-weight:700;color:var(--primary)">${item.priceLabel || item.salaryLabel}</div>
+                  <div style="font-size:0.8rem;color:var(--text-muted);text-align:right">${isRoom ? 'per month' : item.jobType}</div>
+                `}
               </div>
             </div>
             <div class="divider"></div>
             <p style="font-size:0.95rem;line-height:1.8;color:var(--text-body)">${item.desc}</p>
           </div>
 
-
-          <!-- Features / Requirements -->
+          <!-- Features / Requirements / Property Attributes -->
           <div class="glass" style="border-radius:16px;padding:24px;margin-bottom:20px">
-            <h3>${isRoom ? "Features" : "Requirements & Benefits"}</h3>
-            <div class="amenities-grid">
-              ${(isRoom ? item.amenities : item.requirements).length === 0 ? `
-                <div style="color:var(--text-muted); font-size:0.88rem;">No explicit features/requirements declared</div>
-              ` : (isRoom ? item.amenities : item.requirements).map(a => `
+            <h3>${isRoom ? "Features" : isJob ? "Requirements & Benefits" : "Property Attributes"}</h3>
+            ${isGharJagga ? `
+              <div class="amenities-grid">
+                ${item.attributes?.landArea ? `
+                  <div class="amenity-item">
+                    <span class="amenity-icon">📐</span>
+                    <span><strong>Land Area:</strong> ${item.attributes.landArea}</span>
+                  </div>
+                ` : ''}
+                ${item.attributes?.roadAccess ? `
+                  <div class="amenity-item">
+                    <span class="amenity-icon">🛣️</span>
+                    <span><strong>Road Access:</strong> ${item.attributes.roadAccess}</span>
+                  </div>
+                ` : ''}
+                ${item.attributes?.houseFloors ? `
+                  <div class="amenity-item">
+                    <span class="amenity-icon">🏢</span>
+                    <span><strong>Floors:</strong> ${item.attributes.houseFloors}</span>
+                  </div>
+                ` : ''}
                 <div class="amenity-item">
-                  <span class="amenity-icon">${amenityIcon(a)}</span>
-                  <span>${a}</span>
+                  <span class="amenity-icon">🚗</span>
+                  <span><strong>Parking:</strong> ${item.attributes?.parking ? 'Available' : 'Not Available'}</span>
                 </div>
-              `).join('')}
-            </div>
+              </div>
+            ` : `
+              <div class="amenities-grid">
+                ${(isRoom ? item.amenities : item.requirements).length === 0 ? `
+                  <div style="color:var(--text-muted); font-size:0.88rem;">No explicit features/requirements declared</div>
+                ` : (isRoom ? item.amenities : item.requirements).map(a => `
+                  <div class="amenity-item">
+                    <span class="amenity-icon">${amenityIcon(a)}</span>
+                    <span>${a}</span>
+                  </div>
+                `).join('')}
+              </div>
+            `}
           </div>
         </div>
 
@@ -624,10 +722,61 @@ function renderDetailPage(id) {
             </div>
           </div>
 
-          ${!State.memberLoggedIn ? `
-            <button class="btn btn-primary w-full" style="font-size:1rem;padding:14px" onclick="navigate('#/apply/${item.id}')">Apply Now ${Icon.arrow}</button>
-            <p style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-top:10px">Secure payment via eSewa / Khalti</p>
-          ` : ''}
+          ${isGharJagga ? `
+            <div id="inquiry-container">
+              ${State.inquirySubmitted === item.id ? `
+                <div class="glass" style="border-radius:16px;padding:20px;border:1px solid var(--success);background:rgba(46,204,113,0.05);margin-bottom:16px">
+                  <div style="font-size:2.5rem;margin-bottom:12px;text-align:center;">✅</div>
+                  <h3 style="text-align:center;color:var(--success);margin-bottom:8px">Inquiry Sent</h3>
+                  <p style="font-size:0.82rem;color:var(--text-body);line-height:1.6;margin-bottom:16px;text-align:center">
+                    Submitted! Contact our administrator directly via WhatsApp or phone.
+                  </p>
+                  <div style="display:flex;flex-direction:column;gap:10px">
+                    <a href="https://wa.me/${State.adminWhatsapp}?text=${encodeURIComponent(`Hi, I'm interested in the land/house listing "${item.title}" (${item.locality}). I just submitted an inquiry form. Could you share the rate and further details?`)}" target="_blank" class="btn btn-success w-full" style="display:flex;align-items:center;justify-content:center;gap:8px">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm5.835-3.279c1.614.957 3.513 1.463 5.461 1.465 5.75.003 10.429-4.675 10.432-10.43.001-2.788-1.084-5.409-3.056-7.382C16.758 2.395 14.138 1.3 11.348 1.3c-5.748 0-10.428 4.677-10.43 10.432-.001 1.86.486 3.68 1.41 5.295L1.31 22.7l5.63-1.478.021-.001zM17.65 19.3c-.3-.15-1.785-.88-2.065-.98-.28-.1-.49-.15-.69.15-.2.3-.77.98-.95 1.18-.18.2-.35.23-.65.08-1.02-.51-1.785-1.01-2.485-1.63-.52-.46-.8-.85-1.01-1.22-.21-.37-.02-.57.17-.72.17-.13.37-.43.56-.65.2-.22.26-.37.4-.63.14-.27.07-.49-.03-.7-.1-.2-.89-2.14-1.22-2.94-.32-.78-.65-.68-.89-.69-.23-.01-.49-.01-.75-.01-.26 0-.69.1-1.05.49-.36.39-1.39 1.36-1.39 3.32c0 1.96 1.43 3.85 1.63 4.12.2.27 2.8 4.28 6.79 6c.95.41 1.69.66 2.27.85.96.3 1.84.26 2.53.16.77-.11 2.38-.97 2.72-1.92.34-.95.34-1.76.24-1.93-.11-.17-.4-.27-.7-.42z"/></svg>
+                      Contact via WhatsApp
+                    </a>
+                    <a href="tel:${State.adminWhatsapp}" class="btn btn-outline w-full" style="display:flex;align-items:center;justify-content:center;gap:8px">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                      Call Admin
+                    </a>
+                  </div>
+                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:12px;text-align:center">
+                    Admin Phone: <strong>${State.adminWhatsapp}</strong>
+                  </div>
+                </div>
+              ` : `
+                <div class="glass" style="border-radius:16px;padding:20px;margin-bottom:16px">
+                  <h3 style="font-size:1.1rem;margin-bottom:14px">Inquire About Property</h3>
+                  
+                  <div style="font-size:0.8rem;color:var(--text-muted);background:rgba(212,162,76,0.06);border:1px solid rgba(212,162,76,0.2);padding:10px;border-radius:8px;margin-bottom:16px;line-height:1.5">
+                    ℹ️ You can view location, photos, and video here. For rental/sale rate and fee details, please submit this form or contact us directly via WhatsApp/phone — no account or ID verification is needed to inquire.
+                  </div>
+
+                  <form onsubmit="submitGharJaggaInquiry(event, '${item.id}')">
+                    <div class="form-group">
+                      <label for="gji-name" style="font-size:0.8rem;">Full Name <span class="required">*</span></label>
+                      <input id="gji-name" class="form-control" type="text" placeholder="Your Name" required style="font-size:0.85rem;" />
+                    </div>
+                    <div class="form-group">
+                      <label for="gji-phone" style="font-size:0.8rem;">Phone Number <span class="required">*</span></label>
+                      <input id="gji-phone" class="form-control" type="tel" placeholder="98XXXXXXXX" required pattern="[0-9]{10}" style="font-size:0.85rem;" />
+                    </div>
+                    <div class="form-group">
+                      <label for="gji-msg" style="font-size:0.8rem;">Message (Optional)</label>
+                      <textarea id="gji-msg" class="form-control" rows="3" placeholder="I'm interested in this property..." style="font-size:0.85rem;"></textarea>
+                    </div>
+                    <button type="submit" id="gji-submit-btn" class="btn btn-primary w-full" style="padding:12px;font-size:0.9rem">Submit Inquiry</button>
+                  </form>
+                </div>
+              `}
+            </div>
+          ` : `
+            ${!State.memberLoggedIn ? `
+              <button class="btn btn-primary w-full" style="font-size:1rem;padding:14px" onclick="navigate('#/apply/${item.id}')">Apply Now ${Icon.arrow}</button>
+              <p style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-top:10px">Secure payment via eSewa / Khalti</p>
+            ` : ''}
+          `}
         </div>
       </div>
     </div>
@@ -1133,6 +1282,23 @@ function renderAdminDashboard() {
     }
   }
 
+  if (State.adminSection === 'inquiries') {
+    if (State.inquiries === null && !State.loading['admin_inquiries'] && !State.errors['admin_inquiries']) {
+      State.loading['admin_inquiries'] = true;
+      API.getAdminGharJaggaInquiries()
+        .then(res => {
+          State.inquiries = res;
+          State.loading['admin_inquiries'] = false;
+          render();
+        })
+        .catch(err => {
+          State.errors['admin_inquiries'] = err.message;
+          State.loading['admin_inquiries'] = false;
+          render();
+        });
+    }
+  }
+
   if (State.adminSection === 'settings') {
     if (State.storageUsedGB === 0.0 && !State.loading['admin_storage'] && !State.errors['admin_storage']) {
       State.loading['admin_storage'] = true;
@@ -1155,6 +1321,7 @@ function renderAdminDashboard() {
   if (State.adminSection === 'listings') dashboardBodyContent = renderAdminListings();
   if (State.adminSection === 'categories') dashboardBodyContent = renderAdminCategories();
   if (State.adminSection === 'applications') dashboardBodyContent = renderAdminApplications();
+  if (State.adminSection === 'inquiries') dashboardBodyContent = renderAdminInquiries();
   if (State.adminSection === 'settings') dashboardBodyContent = renderAdminSettings();
 
   return `
@@ -1169,6 +1336,7 @@ function renderAdminDashboard() {
         <div style="font-size:0.75rem;font-weight:700;color:rgba(246, 241, 234, 0.4);text-transform:uppercase;letter-spacing:0.06em;padding:0 12px;margin-bottom:12px">Control Panel</div>
         <button class="sidebar-nav-item ${State.adminSection === 'requests' ? 'active' : ''}" onclick="setAdminSection('requests')">Payment Requests</button>
         <button class="sidebar-nav-item ${State.adminSection === 'listings' ? 'active' : ''}" onclick="setAdminSection('listings')">Listings Manager</button>
+        <button class="sidebar-nav-item ${State.adminSection === 'inquiries' ? 'active' : ''}" onclick="setAdminSection('inquiries')">Ghar/Jagga Inquiries</button>
         <button class="sidebar-nav-item ${State.adminSection === 'categories' ? 'active' : ''}" onclick="setAdminSection('categories')">Locations &amp; Seeds</button>
         <button class="sidebar-nav-item ${State.adminSection === 'applications' ? 'active' : ''}" onclick="setAdminSection('applications')">Audits &amp; Candidates</button>
         <button class="sidebar-nav-item ${State.adminSection === 'settings' ? 'active' : ''}" onclick="setAdminSection('settings')">Platform Settings</button>
@@ -1187,7 +1355,7 @@ function renderAdminDashboard() {
             ${State.adminSidebarOpen ? '✕' : '☰'}
           </button>
           <div>
-            <h1 style="font-size:1.8rem;font-family:var(--font-heading);">${State.adminSection === 'requests' ? 'Payment Requests' : State.adminSection === 'listings' ? 'Listings Manager' : State.adminSection === 'categories' ? 'Locations &amp; Categories' : State.adminSection === 'settings' ? 'Platform Settings' : 'All Applications'}</h1>
+            <h1 style="font-size:1.8rem;font-family:var(--font-heading);">${State.adminSection === 'requests' ? 'Payment Requests' : State.adminSection === 'listings' ? 'Listings Manager' : State.adminSection === 'inquiries' ? 'Ghar / Jagga Inquiries' : State.adminSection === 'categories' ? 'Locations &amp; Categories' : State.adminSection === 'settings' ? 'Platform Settings' : 'All Applications'}</h1>
             <p style="color:var(--text-muted);font-size:0.82rem;margin-top:4px;">Secure verification console • Admin: ${State.currentAdmin?.email || ''}</p>
           </div>
         </div>
@@ -1263,19 +1431,24 @@ function renderAdminListings() {
   if (State.loading['admin_listings']) {
     return `<div class="text-center" style="padding: 40px;"><div class="video-loading-spinner" style="display:block;margin:0 auto;"></div></div>`;
   }
-  const isRooms = State.adminListingTab === 'room';
+  const isRoom = State.adminListingTab === 'room';
+  const isJob = State.adminListingTab === 'job';
+  const isLand = State.adminListingTab === 'land';
+  const isHouse = State.adminListingTab === 'house';
   const items = State.listings || [];
 
   return `
   <div class="tabs" style="margin-bottom:20px">
-    <button class="tab-btn ${isRooms ? 'active' : ''}" onclick="State.adminListingTab='room';State.listings=null;render()">Rooms</button>
-    <button class="tab-btn ${!isRooms ? 'active' : ''}" onclick="State.adminListingTab='job';State.listings=null;render()">Jobs</button>
+    <button class="tab-btn ${isRoom ? 'active' : ''}" onclick="State.adminListingTab='room';State.listings=null;render()">Rooms</button>
+    <button class="tab-btn ${isJob ? 'active' : ''}" onclick="State.adminListingTab='job';State.listings=null;render()">Jobs</button>
+    <button class="tab-btn ${isLand ? 'active' : ''}" onclick="State.adminListingTab='land';State.listings=null;render()">Land</button>
+    <button class="tab-btn ${isHouse ? 'active' : ''}" onclick="State.adminListingTab='house';State.listings=null;render()">House</button>
   </div>
 
   <div class="glass-table-wrap">
     <table class="glass-table">
       <thead>
-        <tr><th>Cover</th><th>Title</th><th>Locality</th><th>${isRooms ? 'Type' : 'Category'}</th><th>${isRooms ? 'Price' : 'Salary'}</th><th>Created</th><th>Status</th><th>Actions</th></tr>
+        <tr><th>Cover</th><th>Title</th><th>Locality</th><th>Category/Type</th><th>Rate/Price/Salary</th><th>Created</th><th>Status</th><th>Actions</th></tr>
       </thead>
       <tbody>
         ${items.length === 0 ? `
@@ -1285,10 +1458,10 @@ function renderAdminListings() {
             <td><img src="${item.images[0] || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80'}" alt="${item.title}" style="width:56px;height:40px;border-radius:7px;object-fit:cover" /></td>
             <td style="font-weight:600;max-width:180px">${item.title}</td>
             <td>${item.locality}</td>
-            <td>${isRooms ? (item.roomType || 'Room') : item.category}</td>
-            <td style="font-weight:700;color:var(--primary)">${item.priceLabel || item.salaryLabel}</td>
+            <td>${isRoom ? (item.roomType || 'Room') : item.category}</td>
+            <td style="font-weight:700;color:var(--primary)">${(isLand || isHouse) ? 'Rate on request' : (item.priceLabel || item.salaryLabel)}</td>
             <td style="font-size:0.82rem;color:var(--text-muted)">${item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : 'N/A'}</td>
-            <td><span class="status-badge ${item.status === 'archived' ? 'rejected' : 'confirmed'}" style="font-size:0.7rem">${item.status === 'archived' ? (isRooms ? 'Booked' : 'Filled') : 'Active'}</span></td>
+            <td><span class="status-badge ${item.status === 'archived' ? 'rejected' : 'confirmed'}" style="font-size:0.7rem">${item.status === 'archived' ? (isRoom ? 'Booked' : isJob ? 'Filled' : 'Archived') : 'Active'}</span></td>
             <td>
               <div style="display:flex;gap:6px">
                 <button class="btn btn-ghost btn-icon" title="Preview Media" aria-label="Preview ${item.title}" onclick="showAdminPreview('${item.id}')">${Icon.eye}</button>
@@ -1477,8 +1650,44 @@ function renderAdminSettings() {
   </div>`;
 }
 
+function renderAdminInquiries() {
+  if (State.loading['admin_inquiries']) {
+    return `<div class="text-center" style="padding: 40px;"><div class="video-loading-spinner" style="display:block;margin:0 auto;"></div></div>`;
+  }
+  const items = State.inquiries || [];
+
+  return `
+  <div class="glass-table-wrap">
+    <table class="glass-table">
+      <thead>
+        <tr><th>Timestamp</th><th>Applicant Name</th><th>Phone</th><th>Listing</th><th>Message</th></tr>
+      </thead>
+      <tbody>
+        ${items.length === 0 ? `
+          <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">No inquiries submitted yet</td></tr>
+        ` : items.map(inq => `
+          <tr>
+            <td style="color:var(--text-muted);font-size:0.8rem;white-space:nowrap">${new Date(inq.created_at).toLocaleString()}</td>
+            <td style="font-weight:600">${inq.full_name}</td>
+            <td><a href="tel:${inq.phone}" style="font-weight:600;color:var(--primary);">${inq.phone}</a></td>
+            <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              <a href="#/ghar-jagga/${inq.listing_id}" target="_blank" style="color:inherit;text-decoration:underline;">${inq.listing_title || 'Unknown Listing'}</a>
+            </td>
+            <td style="font-size:0.85rem;line-height:1.4;max-width:300px;word-wrap:break-word;">${inq.message || '<em style="color:var(--text-muted)">No message</em>'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 // // MODALS MARKUP //""""""""""""""""""""""""""""""""""""""""""
 function renderCreateModal() {
+  const isRoom = State.adminListingTab === 'room';
+  const isJob = State.adminListingTab === 'job';
+  const isLand = State.adminListingTab === 'land';
+  const isHouse = State.adminListingTab === 'house';
+
   return `
   <div class="modal-overlay" onclick="if(event.target===this){State.showCreateModal=false;render()}" role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
     <div class="modal-box">
@@ -1488,13 +1697,15 @@ function renderCreateModal() {
       </div>
       <div class="modal-body" style="max-height:70vh;overflow-y:auto">
         <div class="tabs" style="margin-bottom:20px">
-          <button class="tab-btn ${State.adminListingTab === 'room' ? 'active' : ''}" onclick="State.adminListingTab='room';render()">Room</button>
-          <button class="tab-btn ${State.adminListingTab === 'job' ? 'active' : ''}" onclick="State.adminListingTab='job';render()">Job</button>
+          <button class="tab-btn ${isRoom ? 'active' : ''}" onclick="State.adminListingTab='room';render()">Room</button>
+          <button class="tab-btn ${isJob ? 'active' : ''}" onclick="State.adminListingTab='job';render()">Job</button>
+          <button class="tab-btn ${isLand ? 'active' : ''}" onclick="State.adminListingTab='land';render()">Land</button>
+          <button class="tab-btn ${isHouse ? 'active' : ''}" onclick="State.adminListingTab='house';render()">House</button>
         </div>
         
         <div class="form-group">
           <label for="lc-title">Title <span class="required">*</span></label>
-          <input id="lc-title" class="form-control" type="text" placeholder="e.g. 2BHK Flat in Baneshwor" required />
+          <input id="lc-title" class="form-control" type="text" placeholder="e.g. 4 Aana Land in Pepsi Chowk" required />
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
@@ -1505,16 +1716,21 @@ function renderCreateModal() {
             </select>
           </div>
           <div class="form-group">
-            <label for="lc-category">${State.adminListingTab === 'room' ? 'Room Type' : 'Job Category'}</label>
+            <label for="lc-category">${isRoom ? 'Room Type' : isJob ? 'Job Category' : 'Category (Sale/Rent)'}</label>
             <select id="lc-category" class="form-control">
-              ${(State.adminListingTab === 'room' ? State.roomTypes : State.jobCategories).map(t => `<option value="${t}">${t}</option>`).join('')}
+              ${isRoom ? State.roomTypes.map(t => `<option value="${t}">${t}</option>`).join('') :
+                isJob ? State.jobCategories.map(t => `<option value="${t}">${t}</option>`).join('') :
+                `<option value="For Sale">For Sale</option><option value="For Rent">For Rent</option>`
+              }
             </select>
           </div>
-          <div class="form-group">
-            <label for="lc-price">${State.adminListingTab === 'room' ? 'Price (NPR/month) *' : 'Salary (NPR/month) *'}</label>
-            <input id="lc-price" class="form-control" type="number" placeholder="${State.adminListingTab === 'room' ? '15000' : '25000'}" required />
-          </div>
-          ${State.adminListingTab === 'job' ? `
+          ${(isLand || isHouse) ? '' : `
+            <div class="form-group">
+              <label for="lc-price">${isRoom ? 'Price (NPR/month) *' : 'Salary (NPR/month) *'}</label>
+              <input id="lc-price" class="form-control" type="number" placeholder="${isRoom ? '15000' : '25000'}" required />
+            </div>
+          `}
+          ${isJob ? `
             <div class="form-group">
               <label for="lc-jobtype">Job Type</label>
               <select id="lc-jobtype" class="form-control">${JOB_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}</select>
@@ -1525,6 +1741,22 @@ function renderCreateModal() {
               <select id="lc-parking" class="form-control"><option value="Yes">Yes</option><option value="No">No</option></select>
             </div>
           `}
+          ${(isLand || isHouse) ? `
+            <div class="form-group">
+              <label for="lc-landarea">Land Area (e.g. 4 Aana, 1 Ropani)</label>
+              <input id="lc-landarea" class="form-control" type="text" placeholder="e.g. 4 Aana" />
+            </div>
+            <div class="form-group">
+              <label for="lc-roadaccess">Road Access (e.g. 16 ft road)</label>
+              <input id="lc-roadaccess" class="form-control" type="text" placeholder="e.g. 16 ft road" />
+            </div>
+            ${isHouse ? `
+              <div class="form-group">
+                <label for="lc-housefloors">House Floors (e.g. 2.5 Floors)</label>
+                <input id="lc-housefloors" class="form-control" type="text" placeholder="e.g. 2.5" />
+              </div>
+            ` : ''}
+          ` : ''}
         </div>
 
         <div class="form-group">
@@ -1547,16 +1779,18 @@ function renderCreateModal() {
           <input type="file" id="lc-video" class="form-control" accept="video/*" />
         </div>
 
-        <div class="form-group">
-          <label style="color:var(--text-body);font-weight:600;">${State.adminListingTab === 'room' ? 'Features' : 'Requirements'}</label>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            ${(State.adminListingTab === 'room' ? AMENITIES_LIST : JOB_REQUIREMENTS).map(a => `
-              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;cursor:pointer;padding:4px 10px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,0.06)">
-                <input type="checkbox" name="lc-amenity" value="${a}" /> ${amenityIcon(a)} ${a}
-              </label>
-            `).join('')}
+        ${(isRoom || isJob) ? `
+          <div class="form-group">
+            <label style="color:var(--text-body);font-weight:600;">${isRoom ? 'Features' : 'Requirements'}</label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              ${(isRoom ? AMENITIES_LIST : JOB_REQUIREMENTS).map(a => `
+                <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;cursor:pointer;padding:4px 10px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,0.06)">
+                  <input type="checkbox" name="lc-amenity" value="${a}" /> ${amenityIcon(a)} ${a}
+                </label>
+              `).join('')}
+            </div>
           </div>
-        </div>
+        ` : ''}
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="State.showCreateModal=false;render()">Cancel</button>
@@ -1686,7 +1920,15 @@ function renderNotFound() {
 window.setMode = function (m) {
   State.mode = m;
   State.listings = null;
-  render();
+  if (m === 'ghar-jagga') {
+    navigate('#/ghar-jagga');
+  } else {
+    if (location.hash.startsWith('#/ghar-jagga')) {
+      navigate('#/');
+    } else {
+      render();
+    }
+  }
 };
 
 window.setGallery = function (id, idx) {
@@ -1734,6 +1976,19 @@ window.updateJobFilter = function (key, val) {
 
 window.clearJobFilters = function () {
   State.jobFilters = { locality: '', salary: 60000, category: '', jobType: '', experience: '' };
+  State.listings = null;
+  render();
+};
+
+window.updateGharJaggaFilter = function (key, val) {
+  if (!State.gharJaggaFilters) State.gharJaggaFilters = { locality: '', category: '', type: '' };
+  State.gharJaggaFilters[key] = val;
+  State.listings = null;
+  render();
+};
+
+window.clearGharJaggaFilters = function () {
+  State.gharJaggaFilters = { locality: '', category: '', type: '' };
   State.listings = null;
   render();
 };
@@ -1833,6 +2088,37 @@ window.cancelApply = function () {
   State.applyStep = 1;
   State.applyFormData = {};
   navigate('#/');
+};
+
+window.submitGharJaggaInquiry = async function (e, listingId) {
+  e.preventDefault();
+  const name = document.getElementById('gji-name').value.trim();
+  const phone = document.getElementById('gji-phone').value.trim();
+  const msg = document.getElementById('gji-msg').value.trim();
+
+  const btn = document.getElementById('gji-submit-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Submitting...';
+  }
+
+  try {
+    await API.submitGharJaggaInquiry(listingId, name, phone, msg);
+    State.inquirySubmitted = listingId;
+    showToast('Inquiry submitted successfully!');
+    render();
+
+    // Redirect to WhatsApp
+    const item = State.currentListing;
+    const message = `Hi, I'm interested in the land/house listing "${item.title}" (${item.locality}). I just submitted an inquiry form. Could you share the rate and further details?`;
+    window.open(`https://wa.me/${State.adminWhatsapp}?text=${encodeURIComponent(message)}`, '_blank');
+  } catch (err) {
+    showToast(`Inquiry submission failed: ${err.message}`, 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = 'Submit Inquiry';
+    }
+  }
 };
 
 // Member Login
@@ -2185,13 +2471,17 @@ window.publishListing = async function () {
   const title = document.getElementById('lc-title').value.trim();
   const locality = document.getElementById('lc-locality').value;
   const category = document.getElementById('lc-category').value;
-  const price = document.getElementById('lc-price').value;
+  const priceInput = document.getElementById('lc-price');
+  const price = priceInput ? priceInput.value : '';
   const desc = document.getElementById('lc-desc').value.trim();
   const coverFile = document.getElementById('lc-cover').files[0];
   const galleryFiles = document.getElementById('lc-gallery').files;
   const videoFile = document.getElementById('lc-video').files[0];
 
-  if (!title || !price || !coverFile) {
+  const type = State.adminListingTab; // 'room' | 'job' | 'land' | 'house'
+  const isRoomOrJob = type === 'room' || type === 'job';
+
+  if (!title || (!price && isRoomOrJob) || !coverFile) {
     showToast('Please specify all required fields (Title, Price/Salary, and Cover Photo)', 'error');
     return;
   }
@@ -2208,11 +2498,12 @@ window.publishListing = async function () {
 
   try {
     const form = new FormData();
-    const type = State.adminListingTab === 'room' ? 'room' : 'job';
     form.append('type', type);
     form.append('title', title);
     form.append('description', desc);
-    form.append('price_or_salary', price);
+    if (price) {
+      form.append('price_or_salary', price);
+    }
     form.append('locality', locality);
     form.append('category', category);
 
@@ -2223,11 +2514,20 @@ window.publishListing = async function () {
       attributes.furnished = true;
       attributes.suitableFor = 'Family';
       attributes.amenities = checkedAmenities;
-    } else {
+    } else if (type === 'job') {
       const jobtypeVal = document.getElementById('lc-jobtype').value;
       attributes.jobType = jobtypeVal;
       attributes.experience = 'Entry';
       attributes.requirements = checkedAmenities;
+    } else {
+      // Land or House
+      const parkingVal = document.getElementById('lc-parking').value;
+      attributes.parking = parkingVal === 'Yes';
+      attributes.landArea = document.getElementById('lc-landarea').value.trim();
+      attributes.roadAccess = document.getElementById('lc-roadaccess').value.trim();
+      if (type === 'house') {
+        attributes.houseFloors = document.getElementById('lc-housefloors').value.trim();
+      }
     }
 
     form.append('attributes', JSON.stringify(attributes));
@@ -2439,7 +2739,19 @@ function render() {
   let html = '';
 
   if (path === '/' || path === '') {
+    if (State.mode === 'ghar-jagga') State.mode = 'rooms'; // fallback
     html = renderHomePage();
+  } else if (path === '/ghar-jagga') {
+    if (params.id) {
+      if (params.sub === 'booked') {
+        html = renderArchivedPage(params.id, 'ghar-jagga');
+      } else {
+        html = renderDetailPage(params.id);
+      }
+    } else {
+      State.mode = 'ghar-jagga';
+      html = renderHomePage();
+    }
   } else if (path === '/room' && params.id && params.sub === 'booked') {
     html = renderArchivedPage(params.id, 'room');
   } else if (path === '/jobs' && params.id && params.sub === 'filled') {

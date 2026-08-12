@@ -53,10 +53,10 @@ CREATE TABLE IF NOT EXISTS job_categories (
 -- 6. LISTINGS TABLE
 CREATE TABLE IF NOT EXISTS listings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    type TEXT NOT NULL CHECK (type IN ('room', 'job')),
+    type TEXT NOT NULL CHECK (type IN ('room', 'job', 'land', 'house')),
     title TEXT NOT NULL,
     description TEXT,
-    price_or_salary INTEGER NOT NULL,
+    price_or_salary INTEGER,
     locality TEXT NOT NULL,
     category TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived', 'deleted')),
@@ -105,6 +105,16 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value JSONB NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 10. GHAR/JAGGA INQUIRIES TABLE
+CREATE TABLE IF NOT EXISTS ghar_jagga_inquiries (
+    id SERIAL PRIMARY KEY,
+    listing_id UUID REFERENCES listings(id) ON DELETE CASCADE,
+    full_name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50) NOT NULL,
+    message TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- INDEXES FOR FAST QUERYING

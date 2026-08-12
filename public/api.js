@@ -259,4 +259,15 @@ window.API = {
       method: 'DELETE',
     });
   },
+
+  // --- GHAR/JAGGA INQUIRIES ---
+  async submitGharJaggaInquiry(listingId, fullName, phone, message) {
+    return await apiFetch('/api/ghar-jagga/inquiries', {
+      method: 'POST',
+      body: { listing_id: listingId, full_name: fullName, phone, message }
+    });
+  },
+  async getAdminGharJaggaInquiries() {
+    return await apiFetch('/api/admin/ghar-jagga/inquiries');
+  },
 };

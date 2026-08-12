@@ -269,9 +269,13 @@ app.get('/api/listings', async (req, res) => {
     let paramCount = 0;
 
     if (type) {
-      paramCount++;
-      query += ` AND type = $${paramCount}`;
-      params.push(type);
+      if (type === 'ghar-jagga') {
+        query += " AND (type = 'land' OR type = 'house')";
+      } else {
+        paramCount++;
+        query += ` AND type = $${paramCount}`;
+        params.push(type);
+      }
     }
     if (locality) {
       paramCount++;
@@ -319,11 +323,12 @@ app.get('/api/listings', async (req, res) => {
       title: l.title,
       locality: l.locality,
       roomType: l.type === 'room' ? l.category : undefined,
-      category: l.type === 'job' ? l.category : undefined,
+      category: l.type === 'job' ? l.category : (l.type === 'land' || l.type === 'house' ? l.category : undefined),
       price: l.type === 'room' ? l.price_or_salary : undefined,
       salary: l.type === 'job' ? l.price_or_salary : undefined,
       priceLabel: l.type === 'room' ? `Rs. ${l.price_or_salary.toLocaleString()}/mo` : undefined,
       salaryLabel: l.type === 'job' ? `Rs. ${l.price_or_salary.toLocaleString()}/mo` : undefined,
+      contactForRate: (l.type === 'land' || l.type === 'house') ? true : undefined,
       parking: l.attributes?.parking,
       suitableFor: l.attributes?.suitableFor,
       furnished: l.attributes?.furnished,
@@ -335,6 +340,7 @@ app.get('/api/listings', async (req, res) => {
       amenities: l.attributes?.amenities || [],
       requirements: l.attributes?.requirements || [],
       video_url: l.video_url,
+      attributes: l.attributes,
       booked: false
     }));
 
@@ -348,14 +354,16 @@ app.get('/api/listings', async (req, res) => {
       title: l.title,
       locality: l.locality,
       roomType: l.type === 'room' ? l.category : undefined,
-      category: l.type === 'job' ? l.category : undefined,
+      category: l.type === 'job' ? l.category : (l.type === 'land' || l.type === 'house' ? l.category : undefined),
       price: l.type === 'room' ? l.price_or_salary : undefined,
       salary: l.type === 'job' ? l.price_or_salary : undefined,
       priceLabel: l.type === 'room' ? `Rs. ${l.price_or_salary.toLocaleString()}/mo` : undefined,
       salaryLabel: l.type === 'job' ? `Rs. ${l.price_or_salary.toLocaleString()}/mo` : undefined,
+      contactForRate: (l.type === 'land' || l.type === 'house') ? true : undefined,
       images: [l.cover_photo_url],
       postedDate: new Date(l.created_at).toISOString().split('T')[0],
       desc: l.description,
+      attributes: l.attributes,
       booked: true
     }));
 
@@ -376,11 +384,12 @@ app.get('/api/listings/:id', async (req, res) => {
       title: l.title,
       locality: l.locality,
       roomType: l.type === 'room' ? l.category : undefined,
-      category: l.type === 'job' ? l.category : undefined,
+      category: l.type === 'job' ? l.category : (l.type === 'land' || l.type === 'house' ? l.category : undefined),
       price: l.type === 'room' ? l.price_or_salary : undefined,
       salary: l.type === 'job' ? l.price_or_salary : undefined,
       priceLabel: l.type === 'room' ? `Rs. ${l.price_or_salary.toLocaleString()}/mo` : undefined,
       salaryLabel: l.type === 'job' ? `Rs. ${l.price_or_salary.toLocaleString()}/mo` : undefined,
+      contactForRate: (l.type === 'land' || l.type === 'house') ? true : undefined,
       parking: l.attributes?.parking,
       suitableFor: l.attributes?.suitableFor,
       furnished: l.attributes?.furnished,
@@ -392,6 +401,7 @@ app.get('/api/listings/:id', async (req, res) => {
       amenities: l.attributes?.amenities || [],
       requirements: l.attributes?.requirements || [],
       video_url: l.video_url,
+      attributes: l.attributes,
       booked: l.status === 'archived'
     });
   } catch (err) {
@@ -980,12 +990,14 @@ app.post('/api/admin/listings', authenticateAdmin, upload.fields([
       galleryUrls.push(url);
     }
 
+    const parsedPrice = (price_or_salary === undefined || price_or_salary === null || price_or_salary === '') ? 0 : parseInt(price_or_salary);
+
     await pool.query(`
       INSERT INTO listings (
         type, title, description, price_or_salary, locality, category, 
         cover_photo_url, gallery_photo_urls, video_url, attributes, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active')
-    `, [type, title, description, parseInt(price_or_salary), locality, category, coverUrl, galleryUrls, videoUrl, parsedAttr]);
+    `, [type, title, description, parsedPrice, locality, category, coverUrl, galleryUrls, videoUrl, parsedAttr]);
 
     res.json({ success: true });
   } catch (err) {
@@ -1029,7 +1041,8 @@ app.put('/api/admin/listings/:id', authenticateAdmin, upload.fields([
     }
 
     let query = 'UPDATE listings SET title=$1, description=$2, price_or_salary=$3, locality=$4, category=$5, attributes=$6';
-    const params = [title, description, parseInt(price_or_salary), locality, category, parsedAttr];
+    const parsedPrice = (price_or_salary === undefined || price_or_salary === null || price_or_salary === '') ? 0 : parseInt(price_or_salary);
+    const params = [title, description, parsedPrice, locality, category, parsedAttr];
     let count = 6;
 
     if (coverUrl) {
@@ -1332,6 +1345,38 @@ async function runStartupChecks() {
     await seedDatabaseIfEmpty();
   }
 }
+
+// --- GHAR/JAGGA INQUIRIES ROUTE ---
+app.post('/api/ghar-jagga/inquiries', async (req, res) => {
+  const { listing_id, full_name, phone, message } = req.body;
+  if (!listing_id || !full_name || !phone) {
+    return res.status(400).json({ error: 'listing_id, full_name, and phone are required' });
+  }
+  try {
+    await pool.query(
+      `INSERT INTO ghar_jagga_inquiries (listing_id, full_name, phone, message, created_at)
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [listing_id, full_name, phone, message]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/ghar-jagga/inquiries', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT q.*, l.title as listing_title 
+       FROM ghar_jagga_inquiries q
+       LEFT JOIN listings l ON q.listing_id = l.id
+       ORDER BY q.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // SPA catch-all: serve index.html for any route not matched by API or
 // static middleware above. This lets the client-side hash router handle
