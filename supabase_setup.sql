@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS applications (
     occupation TEXT NOT NULL,
     id_type TEXT NOT NULL CHECK (id_type IN ('citizenship', 'passport')),
     citizenship_front_url TEXT NOT NULL,
-    citizenship_back_url TEXT NOT NULL,
+    citizenship_back_url TEXT,
     preferred_date DATE,
     message TEXT,
     password_hash TEXT, -- Set at application time, set to NULL when status = 'visitor_reverted'
@@ -140,11 +140,12 @@ CREATE INDEX IF NOT EXISTS idx_otp_codes_email_used ON otp_codes(email, used);
 INSERT INTO admin (email, password_hash, whatsapp_number)
 VALUES (
     'sadikshyapokhrel177@gmail.com',
-    '$2b$10$wT5gS.H51EwJ3J5D5W5hEOYt7vX.0lRz0D.G1aHhE2iF5eG6h7i8j', -- bcrypt hash for admin@2026
+    '$2a$10$O2EC2pDhawLtAPchh.vnJuxkeIi.gEsZ1B9QysU1KTBGCN9pmKuRC', -- bcrypt hash for admin@2026
     '9779841234567'
 )
 ON CONFLICT (email) DO UPDATE 
-SET whatsapp_number = EXCLUDED.whatsapp_number;
+SET whatsapp_number = EXCLUDED.whatsapp_number,
+    password_hash = EXCLUDED.password_hash;
 
 -- Seed Kathmandu Locations
 INSERT INTO locations (name) VALUES
@@ -182,7 +183,9 @@ ON CONFLICT (name) DO NOTHING;
 
 -- Seed Storage Settings
 INSERT INTO settings (key, value) VALUES
-('storage_usage', '{"used_gb": 6.2, "total_gb": 10.0}'::jsonb)
+('storage_usage', '{"used_gb": 6.2, "total_gb": 10.0}'::jsonb),
+('whatsapp_number', '{"value": "9779841234567"}'::jsonb),
+('payment_qr_code', '{"value": "/default_payment_qr.png"}'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
 -- Seed Room Features

@@ -75,38 +75,50 @@ const JOB_REQUIREMENTS = ['English Speaking', 'Experience Required', 'Uniform Pr
 // // ROUTER //""""""""""""""""""""""""""""""""""""""""""""""""
 function parseRoute() {
   const hash = location.hash.replace('#', '').replace(/^\//, '') || '';
-  if (!hash || hash === '/') return { path: '/', params: {}, full: hash };
+  let segments = [];
+  let full = '';
 
-  const segments = hash.split('/').filter(Boolean);
+  if (hash) {
+    segments = hash.split('/').filter(Boolean);
+    full = hash;
+  } else {
+    const pathname = window.location.pathname.replace(/^\//, '') || '';
+    segments = pathname.split('/').filter(Boolean);
+    full = pathname;
+  }
+
+  if (segments.length === 0) {
+    return { path: '/', params: {}, full: '/' };
+  }
+
   const params = {};
-
   if (segments[0] === 'room') {
     if (segments[1]) params.id = segments[1];
     if (segments[2]) params.sub = segments[2];
-    return { path: '/room', params, full: hash };
+    return { path: '/room', params, full };
   }
   if (segments[0] === 'jobs') {
     if (segments[1]) params.id = segments[1];
     if (segments[2]) params.sub = segments[2];
-    return { path: '/jobs', params, full: hash };
+    return { path: '/jobs', params, full };
   }
   if (segments[0] === 'ghar-jagga') {
     if (segments[1]) params.id = segments[1];
     if (segments[2]) params.sub = segments[2];
-    return { path: '/ghar-jagga', params, full: hash };
+    return { path: '/ghar-jagga', params, full };
   }
   if (segments[0] === 'apply') {
     if (segments[1]) params.id = segments[1];
-    return { path: '/apply', params, full: hash };
+    return { path: '/apply', params, full };
   }
   if (segments[0] === 'admin') {
-    if (segments[1] === 'dashboard') return { path: '/admin', params: { sub: 'dashboard' }, full: hash };
-    return { path: '/admin', params: {}, full: hash };
+    if (segments[1] === 'dashboard') return { path: '/admin', params: { sub: 'dashboard' }, full };
+    return { path: '/admin', params: {}, full };
   }
-  if (segments[0] === 'login') return { path: '/login', params, full: hash };
-  if (segments[0] === 'dashboard') return { path: '/dashboard', params, full: hash };
+  if (segments[0] === 'login') return { path: '/login', params, full };
+  if (segments[0] === 'dashboard') return { path: '/dashboard', params, full };
 
-  return { path: '/' + segments[0], params, full: hash };
+  return { path: '/' + segments[0], params, full };
 }
 
 function navigate(to) {

@@ -52,7 +52,8 @@ async function uploadFile(fileBuffer, key, mimeType) {
  * @returns {Promise<string>} The constructed public access URL via r2.dev
  */
 async function uploadPublicFile(fileBuffer, fileName, mimeType) {
-  const key = `public/${Date.now()}_${fileName}`;
+  const cleanName = path.basename(fileName).replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const key = `public/${Date.now()}_${cleanName}`;
   await uploadFile(fileBuffer, key, mimeType);
   // Use R2_PUBLIC_URL (r2.dev subdomain) — the R2_ENDPOINT is the private S3 API and is NOT browser-accessible
   const publicBase = (process.env.R2_PUBLIC_URL || '').replace(/\/$/, '');
@@ -80,7 +81,8 @@ function getPublicUrl(key) {
  * @returns {Promise<string>} The key of the private file
  */
 async function uploadPrivateFile(fileBuffer, fileName, mimeType) {
-  const key = `private/${Date.now()}_${fileName}`;
+  const cleanName = path.basename(fileName).replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const key = `private/${Date.now()}_${cleanName}`;
   return await uploadFile(fileBuffer, key, mimeType);
 }
 

@@ -1,3 +1,9 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /apply
+Disallow: /api/admin
+Disallow: /api/member
+
 Sitemap: https://kothajagir.com.np/sitemap.xml

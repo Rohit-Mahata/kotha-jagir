@@ -56,6 +56,719 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+// --- SEO PRE-RENDERING ENGINE ---
+const seoCache = new Map();
+function getSeoCache(key) {
+  const entry = seoCache.get(key);
+  if (entry && Date.now() - entry.timestamp < 5 * 60 * 1000) {
+    return entry.data;
+  }
+  return null;
+}
+function setSeoCache(key, data) {
+  seoCache.set(key, { data, timestamp: Date.now() });
+}
+function clearSeoCache() {
+  seoCache.clear();
+}
+
+function generateHtmlTemplate(pageData) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${pageData.title}</title>
+  ${pageData.noindex ? '<meta name="robots" content="noindex, nofollow">\n' : ''}
+  <meta name="description" content="${pageData.description}">
+  <meta name="keywords" content="${pageData.keywords || 'kotha jagir, room finder kathmandu, jobs in kathmandu'}">
+  <meta property="og:title" content="${pageData.ogTitle}">
+  <meta property="og:description" content="${pageData.ogDescription}">
+  <meta property="og:type" content="${pageData.ogType}">
+  <meta property="og:url" content="${pageData.ogUrl}">
+  <meta property="og:image" content="${pageData.ogImage || 'https://kothajagir.com.np/logo.jpeg'}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${pageData.ogTitle}">
+  <meta name="twitter:description" content="${pageData.ogDescription}">
+  <meta name="twitter:image" content="${pageData.ogImage || 'https://kothajagir.com.np/logo.jpeg'}">
+  <link rel="canonical" href="${pageData.canonicalUrl}">
+  <script type="application/ld+json">
+  ${JSON.stringify(pageData.schema)}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css?v=20260813_v2" />
+</head>
+<body>
+  <div id="app">
+    <header style="padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(200, 185, 175, 0.45); background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); position: sticky; top:0; z-index: 1000;">
+      <div style="font-weight: bold; font-size: 1.5rem; font-family: var(--font-heading); color: var(--primary);">
+        <a href="/">🇳🇵 Kotha Jagir Solution</a>
+      </div>
+      <nav style="display: flex; gap: 20px; font-family: var(--font-heading); font-weight: 500;">
+        <a href="/rooms">🏠 Rooms & Flats</a>
+        <a href="/jobs">💼 Jobs</a>
+        <a href="/ghar-jagga">🏡 Ghar/Jagga</a>
+      </nav>
+    </header>
+    
+    <main class="container" style="max-width: 1200px; margin: 40px auto; padding: 0 20px; min-height: 60vh;">
+      ${pageData.bodyHtml}
+    </main>
+    
+    <footer style="margin-top: 80px; padding: 40px 20px; text-align: center; border-top: 1px solid rgba(200,185,175,0.45); color: var(--text-muted); font-size: 0.88rem; background: rgba(255,255,255,0.5);">
+      <p>&copy; 2026 Kotha Jagir Solution Private Limited. Kathmandu, Nepal. All rights reserved.</p>
+      <p style="margin-top: 8px; font-size: 0.75rem;">Your Premium Room Finder & Job Board in Kathmandu Valley.</p>
+    </footer>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+  <script src="/api.js?v=20260813_v2"></script>
+  <script src="/app.js?v=20260813_v2"></script>
+</body>
+</html>`;
+}
+
+// --- DYNAMIC SITEMAP ---
+// --- DYNAMIC SITEMAP ---
+app.get('/sitemap.xml', async (req, res) => {
+  const cacheKey = 'sitemap_xml';
+  const cached = getSeoCache(cacheKey);
+  if (cached) {
+    res.header('Content-Type', 'application/xml');
+    return res.send(cached);
+  }
+  try {
+    const result = await pool.query(
+      "SELECT id, type, updated_at FROM listings WHERE status = 'active' ORDER BY updated_at DESC"
+    );
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+    xml += '  <url>\n    <loc>https://kothajagir.com.np/</loc>\n    <priority>1.0</priority>\n  </url>\n';
+    xml += '  <url>\n    <loc>https://kothajagir.com.np/rooms</loc>\n    <priority>0.9</priority>\n  </url>\n';
+    xml += '  <url>\n    <loc>https://kothajagir.com.np/jobs</loc>\n    <priority>0.9</priority>\n  </url>\n';
+    xml += '  <url>\n    <loc>https://kothajagir.com.np/ghar-jagga</loc>\n    <priority>0.8</priority>\n  </url>\n';
+    for (const row of result.rows) {
+      let segment = 'room';
+      if (row.type === 'job') segment = 'jobs';
+      else if (row.type === 'land' || row.type === 'house') segment = 'ghar-jagga';
+      const lastMod = new Date(row.updated_at).toISOString().split('T')[0];
+      xml += `  <url>\n    <loc>https://kothajagir.com.np/${segment}/${row.id}</loc>\n    <lastmod>${lastMod}</lastmod>\n    <priority>0.7</priority>\n  </url>\n`;
+    }
+    xml += '</urlset>';
+    setSeoCache(cacheKey, xml);
+    res.header('Content-Type', 'application/xml');
+    res.send(xml);
+  } catch (err) {
+    res.status(500).send('Error generating sitemap');
+  }
+});
+
+// --- SEO LANDING PAGES ROUTING ---
+app.get('/', async (req, res, next) => {
+  const cacheKey = 'home_page';
+  const cached = getSeoCache(cacheKey);
+  if (cached) return res.send(cached);
+  try {
+      const roomRes = await pool.query("SELECT * FROM listings WHERE type = 'room' AND status = 'active' ORDER BY created_at DESC LIMIT 3");
+      const jobRes = await pool.query("SELECT * FROM listings WHERE type = 'job' AND status = 'active' ORDER BY created_at DESC LIMIT 3");
+      const propertyRes = await pool.query("SELECT * FROM listings WHERE (type = 'land' OR type = 'house') AND status = 'active' ORDER BY created_at DESC LIMIT 3");
+      
+      let bodyHtml = `
+        <section class="hero" style="text-align: center; padding: 60px 20px; background: rgba(255, 255, 255, 0.4); border-radius: 24px; border: var(--glass-border);">
+          <h1 style="margin-bottom: 16px; font-family: var(--font-heading); color: var(--primary);">Kotha Jagir Solution</h1>
+          <p style="font-size: 1.2rem; color: var(--text-body); max-width: 700px; margin: 0 auto 30px;">
+            Your trusted room finder, flat finder, and job finder platform in Kathmandu, Nepal. Browse verified rooms for rent, flat listings, job vacancies, and land/house properties.
+          </p>
+          <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+            <a href="/rooms" class="btn btn-primary" style="padding: 12px 24px; border-radius: 12px; background: var(--primary); color: white; font-weight: 600;">Find Rooms & Flats</a>
+            <a href="/jobs" class="btn btn-outline" style="padding: 12px 24px; border-radius: 12px; border: 1px solid var(--primary); color: var(--primary); font-weight: 600;">Find Jobs</a>
+            <a href="/ghar-jagga" class="btn btn-outline" style="padding: 12px 24px; border-radius: 12px; border: 1px solid var(--primary); color: var(--primary); font-weight: 600;">Explore Properties</a>
+          </div>
+        </section>
+
+        <section style="margin-top: var(--section-gap);">
+          <h2 style="margin-bottom: 24px; font-family: var(--font-heading);">Featured Rooms & Flats in Kathmandu</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
+            ${roomRes.rows.map(item => `
+              <article style="background: rgba(255, 255, 255, 0.8); border: var(--glass-border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+                <h3><a href="/room/${item.id}">${item.title}</a></h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin: 8px 0;">Locality: ${item.locality} | ${item.category}</p>
+                <p style="font-weight: bold; color: var(--primary); margin-bottom: 12px;">Rs. ${item.price_or_salary.toLocaleString()}/month</p>
+                <p style="font-size: 0.88rem; color: var(--text-body);">${item.description ? item.description.substring(0, 100) + '...' : ''}</p>
+              </article>
+            `).join('')}
+          </div>
+        </section>
+
+        <section style="margin-top: var(--section-gap);">
+          <h2 style="margin-bottom: 24px; font-family: var(--font-heading);">Recent Job Opportunities</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
+            ${jobRes.rows.map(item => `
+              <article style="background: rgba(255, 255, 255, 0.8); border: var(--glass-border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+                <h3><a href="/jobs/${item.id}">${item.title}</a></h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin: 8px 0;">Category: ${item.category} | Location: ${item.locality}</p>
+                <p style="font-weight: bold; color: var(--primary); margin-bottom: 12px;">Salary: Rs. ${item.price_or_salary.toLocaleString()}/month</p>
+                <p style="font-size: 0.88rem; color: var(--text-body);">${item.description ? item.description.substring(0, 100) + '...' : ''}</p>
+              </article>
+            `).join('')}
+          </div>
+        </section>
+
+        <section style="margin-top: var(--section-gap);">
+          <h2 style="margin-bottom: 24px; font-family: var(--font-heading);">House & Land for Sale/Rent</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
+            ${propertyRes.rows.map(item => `
+              <article style="background: rgba(255, 255, 255, 0.8); border: var(--glass-border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+                <h3><a href="/ghar-jagga/${item.id}">${item.title}</a></h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin: 8px 0;">Type: ${item.type} | Category: ${item.category} in ${item.locality}</p>
+                <p style="font-size: 0.88rem; color: var(--text-body);">${item.description ? item.description.substring(0, 100) + '...' : ''}</p>
+              </article>
+            `).join('')}
+          </div>
+        </section>
+
+        <section style="margin-top: var(--section-gap); background: rgba(255,255,255,0.4); border-radius: 20px; padding: 30px; border: var(--glass-border);">
+          <h2 style="margin-bottom: 20px; font-family: var(--font-heading);">Frequently Asked Questions (FAQ)</h2>
+          <div style="margin-bottom: 15px;">
+            <h4>How to find rooms in Kathmandu?</h4>
+            <p style="color: var(--text-body); font-size: 0.95rem;">Kotha Jagir makes it easy to find rooms. Browse our verified room and flat listings, filter by locality (e.g. New Baneshwor, Koteshwor, Chabahil) and maximum budget.</p>
+          </div>
+          <div style="margin-bottom: 15px;">
+            <h4>Is there a service charge for room finding?</h4>
+            <p style="color: var(--text-body); font-size: 0.95rem;">We charge a minimal verification fee of Rs. 500 to become a member and access verified room owner contacts directly.</p>
+          </div>
+          <div>
+            <h4>How do I apply for jobs in Kathmandu?</h4>
+            <p style="color: var(--text-body); font-size: 0.95rem;">You can apply for jobs by submitting your details on our platform. Administrators will verify your application and connect you with verified employers.</p>
+          </div>
+        </section>
+      `;
+
+      const pageData = {
+        title: "Kotha Jagir Solution | Rooms, Flats & Jobs in Kathmandu",
+        description: "Kotha Jagir is a trusted room finder and job finder platform in Kathmandu, Nepal. Find rooms for rent, flats for rent, kotha bhada, and job vacancies across Koteshwor, New Baneshwor, Kalanki, Chabahil, Lazimpat, Maharajgunj, Thamel, Pepsicola and more.",
+        keywords: "room finder Kathmandu, flat finder Kathmandu, room for rent Kathmandu, flat for rent Kathmandu, room finder Nepal, kotha bhada Kathmandu, kotha jagir, job finder Nepal, job vacancy Kathmandu, jagir Kathmandu, ghar jagga Kathmandu, land for sale Kathmandu, house for sale Kathmandu",
+        ogTitle: "Kotha Jagir - Room & Job Finder in Kathmandu",
+        ogDescription: "Browse verified rooms, flats, jobs, and land/house listings across Kathmandu Valley.",
+        ogType: "website",
+        ogUrl: "https://kothajagir.com.np/",
+        ogImage: "https://kothajagir.com.np/logo.jpeg",
+        canonicalUrl: "https://kothajagir.com.np/",
+        schema: {
+          "@context": "https://schema.org",
+          "@type": "RealEstateAgent",
+          "name": "Kotha Jagir Solution Pvt. Ltd.",
+          "url": "https://kothajagir.com.np/",
+          "areaServed": "Kathmandu, Nepal",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Pepsicola Chowk",
+            "addressLocality": "Kathmandu",
+            "addressCountry": "NP"
+          },
+          "description": "Room finder, flat finder, and job finder platform in Kathmandu, Nepal. Also known for ghar jagga (land and house) listings."
+        },
+        bodyHtml
+      };
+      const html = generateHtmlTemplate(pageData);
+      setSeoCache(cacheKey, html);
+      return res.send(html);
+    } catch (err) {
+      return next();
+    }
+});
+
+app.get('/rooms', async (req, res, next) => {
+  const cacheKey = 'rooms_page';
+  const cached = getSeoCache(cacheKey);
+  if (cached) return res.send(cached);
+  try {
+      const result = await pool.query("SELECT * FROM listings WHERE type = 'room' AND status = 'active' ORDER BY created_at DESC");
+      let bodyHtml = `
+        <section style="margin-bottom: 40px;">
+          <h1 style="margin-bottom: 12px; font-family: var(--font-heading); color: var(--primary);">Room & Flat Finder in Kathmandu</h1>
+          <p style="font-size: 1.1rem; color: var(--text-muted); max-width: 800px; line-height:1.6;">
+            Find verified rooms, shared flats, and apartments for rent across Kathmandu Valley. Browse options in Pepsi Chowk, New Baneshwor, Koteshwor, Chabahil, Lazimpat, Thamel, and more. Filter by monthly budget, room type, and essential amenities like parking and Wifi.
+          </p>
+        </section>
+
+        <section style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; margin-bottom: 40px;">
+          ${result.rows.map(item => `
+            <article style="background: rgba(255, 255, 255, 0.8); border: var(--glass-border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+              <h3><a href="/room/${item.id}">${item.title}</a></h3>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin: 8px 0;">Locality: ${item.locality} | Type: ${item.category}</p>
+              <p style="font-weight: bold; color: var(--primary); margin-bottom: 12px;">Rs. ${item.price_or_salary.toLocaleString()}/month</p>
+              <p style="font-size: 0.88rem; color: var(--text-body);">${item.description ? item.description.substring(0, 120) + '...' : ''}</p>
+            </article>
+          `).join('')}
+        </section>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 40px; margin-bottom: 40px;">
+          <section style="background: rgba(255,255,255,0.4); border-radius: 20px; padding: 30px; border: var(--glass-border);">
+            <h2 style="margin-bottom: 16px; font-family: var(--font-heading);">Popular Room Locations in Kathmandu</h2>
+            <p style="margin-bottom: 15px; color: var(--text-body);">We offer verified room finding services across major residential and commercial hubs in Kathmandu:</p>
+            <ul style="list-style-type: none; padding: 0; color: var(--text-body);">
+              <li style="margin-bottom: 10px;"><strong>New Baneshwor:</strong> Popular central area for students and office workers.</li>
+              <li style="margin-bottom: 10px;"><strong>Koteshwor:</strong> Hub with affordable single rooms and flat options.</li>
+              <li style="margin-bottom: 10px;"><strong>Pepsi Chowk (Pepsicola):</strong> Peaceful residential area with flats and rooms.</li>
+              <li style="margin-bottom: 10px;"><strong>Chabahil & Kalanki:</strong> Major transit points with varied room sizes.</li>
+              <li style="margin-bottom: 10px;"><strong>Thamel & Lazimpat:</strong> Premium apartments and studio flats.</li>
+              <li style="margin-bottom: 10px;"><strong>Maharajgunj:</strong> Prime residential area near hospitals and teaching hubs.</li>
+            </ul>
+          </section>
+
+          <section style="background: rgba(255,255,255,0.4); border-radius: 20px; padding: 30px; border: var(--glass-border);">
+            <h2 style="margin-bottom: 16px; font-family: var(--font-heading);">Room & Flat Types Available</h2>
+            <p style="margin-bottom: 15px; color: var(--text-body);">Browse various space options tailored to your budget and privacy preferences:</p>
+            <ul style="list-style-type: none; padding: 0; color: var(--text-body);">
+              <li style="margin-bottom: 10px;"><strong>Single Room:</strong> Budget-friendly spaces perfect for students and single professionals.</li>
+              <li style="margin-bottom: 10px;"><strong>Double Room:</strong> Shared rooms with adequate spaces.</li>
+              <li style="margin-bottom: 10px;"><strong>1 BHK Flat:</strong> 1 bedroom, kitchen, and bathroom for independent living.</li>
+              <li style="margin-bottom: 10px;"><strong>2 BHK Flat:</strong> 2 bedrooms, kitchen, hall, and bathroom for families.</li>
+              <li style="margin-bottom: 10px;"><strong>3 BHK Flat:</strong> Large apartments suitable for families or group sharing.</li>
+              <li style="margin-bottom: 10px;"><strong>Studio Apartment:</strong> Self-contained single-room setups with high-end finishes.</li>
+            </ul>
+          </section>
+        </div>
+
+        <section style="background: rgba(255,255,255,0.4); border-radius: 20px; padding: 30px; border: var(--glass-border); margin-top: 20px;">
+          <h2 style="margin-bottom: 16px; font-family: var(--font-heading);">Why Choose Kotha Jagir for Room Finding?</h2>
+          <p style="color: var(--text-body); line-height: 1.6; margin-bottom: 10px;">
+            Finding a flat or kotha in Kathmandu is traditionally slow and dominated by brokers charging high commissions. Kotha Jagir simplifies the search by directly connecting you with room owners.
+          </p>
+          <ul style="color: var(--text-body); line-height: 1.6; padding-left: 20px;">
+            <li><strong>Verified Listings:</strong> Every single room and flat listing is verified by our team.</li>
+            <li><strong>Direct Owner Contacts:</strong> No middleman commission or brokerage fees.</li>
+            <li><strong>Affordable Membership:</strong> Pay a small one-time verification fee of Rs. 500 to access verified contacts directly.</li>
+          </ul>
+        </section>
+      `;
+
+      const pageData = {
+        title: "Room & Flat Finder in Kathmandu | Kotha Jagir Solution",
+        description: "Find rooms, flats and apartments for rent across Kathmandu. Browse verified listings by location, budget, room type and amenities.",
+        keywords: "room finder kathmandu, room for rent kathmandu, flat for rent kathmandu, kotha bhada kathmandu",
+        ogTitle: "Room & Flat Finder in Kathmandu | Kotha Jagir Solution",
+        ogDescription: "Find rooms, flats and apartments for rent across Kathmandu. Browse verified listings by location, budget, room type and amenities.",
+        ogType: "website",
+        ogUrl: "https://kothajagir.com.np/rooms",
+        canonicalUrl: "https://kothajagir.com.np/rooms",
+        schema: {
+          "@context": "https://schema.org",
+          "@type": "ItemPage",
+          "name": "Room & Flat Finder in Kathmandu",
+          "description": "Browse verified rooms and flats for rent in Kathmandu, Nepal.",
+          "breadcrumb": {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://kothajagir.com.np/" },
+              { "@type": "ListItem", "position": 2, "name": "Rooms", "item": "https://kothajagir.com.np/rooms" }
+            ]
+          }
+        },
+        bodyHtml
+      };
+      const html = generateHtmlTemplate(pageData);
+      setSeoCache(cacheKey, html);
+      return res.send(html);
+    } catch (err) {
+      return next();
+    }
+});
+
+app.get('/jobs', async (req, res, next) => {
+  const cacheKey = 'jobs_page';
+  const cached = getSeoCache(cacheKey);
+  if (cached) return res.send(cached);
+  try {
+      const result = await pool.query("SELECT * FROM listings WHERE type = 'job' AND status = 'active' ORDER BY created_at DESC");
+      let bodyHtml = `
+        <section style="margin-bottom: 40px;">
+          <h1 style="margin-bottom: 12px; font-family: var(--font-heading); color: var(--primary);">Job Finder in Kathmandu</h1>
+          <p style="font-size: 1.1rem; color: var(--text-muted); max-width: 800px; line-height:1.6;">
+            Explore verified job vacancies and career opportunities across Kathmandu Valley. Find part-time, full-time, and contract roles in hospitality, IT, customer services, delivery, educational sector, and finance. Apply securely and quickly.
+          </p>
+        </section>
+
+        <section style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
+          ${result.rows.map(item => `
+            <article style="background: rgba(255, 255, 255, 0.8); border: var(--glass-border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+              <h3><a href="/jobs/${item.id}">${item.title}</a></h3>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin: 8px 0;">Category: ${item.category} | Locality: ${item.locality}</p>
+              <p style="font-weight: bold; color: var(--primary); margin-bottom: 12px;">Salary: Rs. ${item.price_or_salary.toLocaleString()}/month</p>
+              <p style="font-size: 0.88rem; color: var(--text-body);">${item.description ? item.description.substring(0, 120) + '...' : ''}</p>
+            </article>
+          `).join('')}
+        </section>
+      `;
+
+      const pageData = {
+        title: "Job Finder in Kathmandu | Kathmandu Jobs | Kotha Jagir Solution",
+        description: "Find jobs in Kathmandu across IT, hospitality, sales, education, delivery and more. Browse opportunities by salary, location and experience.",
+        keywords: "jobs in kathmandu, job vacancy kathmandu, kathmandu jobs, job finder nepal",
+        ogTitle: "Job Finder in Kathmandu | Kotha Jagir Solution",
+        ogDescription: "Find jobs in Kathmandu across IT, hospitality, sales, education, delivery and more. Browse opportunities by salary, location and experience.",
+        ogType: "website",
+        ogUrl: "https://kothajagir.com.np/jobs",
+        canonicalUrl: "https://kothajagir.com.np/jobs",
+        schema: {
+          "@context": "https://schema.org",
+          "@type": "ItemPage",
+          "name": "Job Finder in Kathmandu",
+          "description": "Browse verified job vacancies in Kathmandu, Nepal.",
+          "breadcrumb": {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://kothajagir.com.np/" },
+              { "@type": "ListItem", "position": 2, "name": "Jobs", "item": "https://kothajagir.com.np/jobs" }
+            ]
+          }
+        },
+        bodyHtml
+      };
+      const html = generateHtmlTemplate(pageData);
+      setSeoCache(cacheKey, html);
+      return res.send(html);
+    } catch (err) {
+      return next();
+    }
+});
+
+app.get('/ghar-jagga', async (req, res, next) => {
+  const cacheKey = 'ghar_jagga_page';
+  const cached = getSeoCache(cacheKey);
+  if (cached) return res.send(cached);
+  try {
+      const result = await pool.query("SELECT * FROM listings WHERE (type = 'land' OR type = 'house') AND status = 'active' ORDER BY created_at DESC");
+      let bodyHtml = `
+        <section style="margin-bottom: 40px;">
+          <h1 style="margin-bottom: 12px; font-family: var(--font-heading); color: var(--primary);">House & Land Finder in Kathmandu</h1>
+          <p style="font-size: 1.1rem; color: var(--text-muted); max-width: 800px; line-height:1.6;">
+            Explore premium houses and land plots for sale or rent across Kathmandu, Nepal. Contact us directly to obtain pricing, rates, and schedule property walkthroughs.
+          </p>
+        </section>
+
+        <section style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
+          ${result.rows.map(item => `
+            <article style="background: rgba(255, 255, 255, 0.8); border: var(--glass-border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+              <h3><a href="/ghar-jagga/${item.id}">${item.title}</a></h3>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin: 8px 0;">Category: ${item.category} | Type: ${item.type} in ${item.locality}</p>
+              <p style="font-size: 0.88rem; color: var(--text-body);">${item.description ? item.description.substring(0, 120) + '...' : ''}</p>
+            </article>
+          `).join('')}
+        </section>
+      `;
+
+      const pageData = {
+        title: "House & Land for Sale/Rent in Kathmandu | Kotha Jagir Solution",
+        description: "Find houses and land for sale or rent in Kathmandu. Browse property listings by location and property type.",
+        keywords: "house for sale kathmandu, land for sale kathmandu, ghar jagga kathmandu, property rent kathmandu",
+        ogTitle: "House & Land for Sale/Rent in Kathmandu | Kotha Jagir Solution",
+        ogDescription: "Find houses and land for sale or rent in Kathmandu. Browse property listings by location and property type.",
+        ogType: "website",
+        ogUrl: "https://kothajagir.com.np/ghar-jagga",
+        canonicalUrl: "https://kothajagir.com.np/ghar-jagga",
+        schema: {
+          "@context": "https://schema.org",
+          "@type": "ItemPage",
+          "name": "House & Land Finder in Kathmandu",
+          "description": "Browse verified property listings in Kathmandu, Nepal.",
+          "breadcrumb": {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://kothajagir.com.np/" },
+              { "@type": "ListItem", "position": 2, "name": "Ghar Jagga", "item": "https://kothajagir.com.np/ghar-jagga" }
+            ]
+          }
+        },
+        bodyHtml
+      };
+      const html = generateHtmlTemplate(pageData);
+      setSeoCache(cacheKey, html);
+      return res.send(html);
+    } catch (err) {
+      return next();
+    }
+});
+
+app.get('/room/:id', async (req, res, next) => {
+  const cacheKey = `room_detail_${req.params.id}`;
+  const cached = getSeoCache(cacheKey);
+  if (cached) return res.send(cached);
+  try {
+      const result = await pool.query("SELECT * FROM listings WHERE id = $1 AND type = 'room'", [req.params.id]);
+      if (result.rows.length === 0) return next();
+      const item = result.rows[0];
+      if (item.status === 'deleted') {
+        return res.status(404).send('Listing not found or has been deleted');
+      }
+      const isArchived = item.status === 'archived';
+
+      let bodyHtml = `
+        <article style="background: rgba(255, 255, 255, 0.8); border: var(--glass-border); border-radius: 18px; padding: 30px;">
+          ${isArchived ? `
+            <div style="background: var(--warning-bg); border: 1px solid var(--warning); padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; color: var(--text-dark);">
+              ⚠️ Already Booked: This room listing is currently inactive.
+            </div>
+          ` : ''}
+          <h1 style="color: var(--primary); font-family: var(--font-heading); margin-bottom: 16px;">${item.title}</h1>
+          <p style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 20px;">
+            Located in <strong>${item.locality}</strong> | Room Type: <strong>${item.category}</strong>
+          </p>
+          
+          <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary); margin-bottom: 30px;">
+            Monthly Rent: Rs. ${item.price_or_salary.toLocaleString()}
+          </div>
+          
+          ${item.cover_photo_url ? `
+            <img src="${item.cover_photo_url}" alt="${item.title}" style="width: 100%; max-height: 500px; object-fit: cover; border-radius: 12px; margin-bottom: 30px;" />
+          ` : ''}
+          
+          <div style="margin-bottom: 30px;">
+            <h2 style="font-family: var(--font-heading); margin-bottom: 12px;">Description</h2>
+            <p style="color: var(--text-body); white-space: pre-line; line-height: 1.6;">${item.description || 'No description provided.'}</p>
+          </div>
+
+          ${item.attributes?.amenities && item.attributes.amenities.length > 0 ? `
+            <div style="margin-bottom: 30px;">
+              <h2 style="font-family: var(--font-heading); margin-bottom: 12px;">Amenities</h2>
+              <ul style="display: flex; gap: 10px; flex-wrap: wrap; list-style: none; padding: 0;">
+                ${item.attributes.amenities.map(a => `
+                  <li style="padding: 8px 16px; background: rgba(0,0,0,0.05); border-radius: 20px; font-size: 0.9rem; color: var(--text-body);">${a}</li>
+                `).join('')}
+              </ul>
+            </div>
+          ` : ''}
+
+          <div style="border-top: 1px solid rgba(0,0,0,0.1); padding-top: 20px; margin-top: 40px; text-align: center;">
+            <p style="font-size: 1rem; color: var(--text-body); margin-bottom: 15px;">
+              Interested in this room? Scan our QR code to secure owner contacts and schedule a visit.
+            </p>
+            <a href="/#/room/${item.id}" class="btn btn-primary" style="padding: 12px 24px; border-radius: 12px; background: var(--primary); color: white; font-weight: 600;">Apply to Rent Room</a>
+          </div>
+        </article>
+      `;
+
+      const pageData = {
+        title: `${item.title} in ${item.locality} | Kotha Jagir Solution`,
+        description: `${item.title} for rent in ${item.locality}. Price: Rs. ${item.price_or_salary.toLocaleString()}/month. Browse amenities, gallery and book verified flat.`,
+        keywords: `${item.category}, room for rent ${item.locality.split(',')[0]}, flat in ${item.locality.split(',')[0]}`,
+        ogTitle: `${item.title} for Rent`,
+        ogDescription: `${item.title} for rent in ${item.locality}. Rent: Rs. ${item.price_or_salary.toLocaleString()}/month.`,
+        ogType: "article",
+        ogUrl: `https://kothajagir.com.np/room/${item.id}`,
+        ogImage: item.cover_photo_url,
+        canonicalUrl: `https://kothajagir.com.np/room/${item.id}`,
+        noindex: isArchived,
+        schema: {
+          "@context": "https://schema.org",
+          "@type": "Accommodation",
+          "name": item.title,
+          "description": item.description,
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": item.locality,
+            "addressCountry": "NP"
+          },
+          "offers": {
+            "@type": "Offer",
+            "price": item.price_or_salary,
+            "priceCurrency": "NPR",
+            "availability": isArchived ? "https://schema.org/OutOfStock" : "https://schema.org/InStock"
+          }
+        },
+        bodyHtml
+      };
+      const html = generateHtmlTemplate(pageData);
+      setSeoCache(cacheKey, html);
+      return res.send(html);
+    } catch (err) {
+      return next();
+    }
+});
+
+app.get('/jobs/:id', async (req, res, next) => {
+  const cacheKey = `jobs_detail_${req.params.id}`;
+  const cached = getSeoCache(cacheKey);
+  if (cached) return res.send(cached);
+  try {
+      const result = await pool.query("SELECT * FROM listings WHERE id = $1 AND type = 'job'", [req.params.id]);
+      if (result.rows.length === 0) return next();
+      const item = result.rows[0];
+      if (item.status === 'deleted') {
+        return res.status(404).send('Listing not found or has been deleted');
+      }
+      const isArchived = item.status === 'archived';
+
+      let bodyHtml = `
+        <article style="background: rgba(255, 255, 255, 0.8); border: var(--glass-border); border-radius: 18px; padding: 30px;">
+          ${isArchived ? `
+            <div style="background: var(--warning-bg); border: 1px solid var(--warning); padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; color: var(--text-dark);">
+              ⚠️ Position Filled: This job listing is currently inactive.
+            </div>
+          ` : ''}
+          <h1 style="color: var(--primary); font-family: var(--font-heading); margin-bottom: 16px;">${item.title}</h1>
+          <p style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 20px;">
+            Job Category: <strong>${item.category}</strong> | Location: <strong>${item.locality}</strong>
+          </p>
+          
+          <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary); margin-bottom: 30px;">
+            Salary: Rs. ${item.price_or_salary.toLocaleString()}/month
+          </div>
+          
+          ${item.cover_photo_url ? `
+            <img src="${item.cover_photo_url}" alt="${item.title}" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 12px; margin-bottom: 30px;" />
+          ` : ''}
+          
+          <div style="margin-bottom: 30px;">
+            <h2 style="font-family: var(--font-heading); margin-bottom: 12px;">Job Description</h2>
+            <p style="color: var(--text-body); white-space: pre-line; line-height: 1.6;">${item.description || 'No description provided.'}</p>
+          </div>
+
+          ${item.attributes?.requirements && item.attributes.requirements.length > 0 ? `
+            <div style="margin-bottom: 30px;">
+              <h2 style="font-family: var(--font-heading); margin-bottom: 12px;">Job Requirements</h2>
+              <ul style="display: flex; gap: 10px; flex-wrap: wrap; list-style: none; padding: 0;">
+                ${item.attributes.requirements.map(r => `
+                  <li style="padding: 8px 16px; background: rgba(0,0,0,0.05); border-radius: 20px; font-size: 0.9rem; color: var(--text-body);">${r}</li>
+                `).join('')}
+              </ul>
+            </div>
+          ` : ''}
+
+          <div style="border-top: 1px solid rgba(0,0,0,0.1); padding-top: 20px; margin-top: 40px; text-align: center;">
+            <a href="/#/jobs/${item.id}" class="btn btn-primary" style="padding: 12px 24px; border-radius: 12px; background: var(--primary); color: white; font-weight: 600;">Apply for this Job</a>
+          </div>
+        </article>
+      `;
+
+      const pageData = {
+        title: `${item.title} Job Vacancy in ${item.locality} | Kotha Jagir Solution`,
+        description: `${item.title} vacancy in ${item.locality} under ${item.category}. Salary: Rs. ${item.price_or_salary.toLocaleString()}/month. Browse requirements and apply.`,
+        keywords: `${item.title}, job vacancy kathmandu, ${item.category} jobs`,
+        ogTitle: `${item.title} Vacancy`,
+        ogDescription: `${item.title} job vacancy in ${item.locality}. Salary: Rs. ${item.price_or_salary.toLocaleString()}/month.`,
+        ogType: "article",
+        ogUrl: `https://kothajagir.com.np/jobs/${item.id}`,
+        ogImage: item.cover_photo_url,
+        canonicalUrl: `https://kothajagir.com.np/jobs/${item.id}`,
+        noindex: isArchived,
+        schema: {
+          "@context": "https://schema.org",
+          "@type": "JobPosting",
+          "title": item.title,
+          "description": item.description || '',
+          "datePosted": item.created_at,
+          "hiringOrganization": {
+            "@type": "Organization",
+            "name": "Kotha Jagir Solution Partner",
+            "sameAs": "https://kothajagir.com.np/"
+          },
+          "jobLocation": {
+            "@type": "Place",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": item.locality,
+              "addressCountry": "NP"
+            }
+          },
+          "baseSalary": {
+            "@type": "MonetaryAmount",
+            "currency": "NPR",
+            "value": {
+              "@type": "QuantitativeValue",
+              "value": item.price_or_salary,
+              "unitText": "MONTH"
+            }
+          },
+          "employmentType": item.attributes?.jobType || "Full-time"
+        },
+        bodyHtml
+      };
+      const html = generateHtmlTemplate(pageData);
+      setSeoCache(cacheKey, html);
+      return res.send(html);
+    } catch (err) {
+      return next();
+    }
+});
+
+app.get('/ghar-jagga/:id', async (req, res, next) => {
+  const cacheKey = `ghar_jagga_detail_${req.params.id}`;
+  const cached = getSeoCache(cacheKey);
+  if (cached) return res.send(cached);
+  try {
+      const result = await pool.query("SELECT * FROM listings WHERE id = $1 AND (type = 'land' OR type = 'house')", [req.params.id]);
+      if (result.rows.length === 0) return next();
+      const item = result.rows[0];
+      if (item.status === 'deleted') {
+        return res.status(404).send('Listing not found or has been deleted');
+      }
+      const isArchived = item.status === 'archived';
+
+      let bodyHtml = `
+        <article style="background: rgba(255, 255, 255, 0.8); border: var(--glass-border); border-radius: 18px; padding: 30px;">
+          ${isArchived ? `
+            <div style="background: var(--warning-bg); border: 1px solid var(--warning); padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; color: var(--text-dark);">
+              ⚠️ Inactive Listing: This property is currently not available.
+            </div>
+          ` : ''}
+          <h1 style="color: var(--primary); font-family: var(--font-heading); margin-bottom: 16px;">${item.title}</h1>
+          <p style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 20px;">
+            Category: <strong>${item.category}</strong> | Type: <strong>${item.type}</strong> | Location: <strong>${item.locality}</strong>
+          </p>
+          
+          ${item.cover_photo_url ? `
+            <img src="${item.cover_photo_url}" alt="${item.title}" style="width: 100%; max-height: 500px; object-fit: cover; border-radius: 12px; margin-bottom: 30px;" />
+          ` : ''}
+          
+          <div style="margin-bottom: 30px;">
+            <h2 style="font-family: var(--font-heading); margin-bottom: 12px;">Property Description</h2>
+            <p style="color: var(--text-body); white-space: pre-line; line-height: 1.6;">${item.description || 'No description provided.'}</p>
+          </div>
+
+          <div style="border-top: 1px solid rgba(0,0,0,0.1); padding-top: 20px; margin-top: 40px; text-align: center;">
+            <p style="font-size: 1.05rem; color: var(--text-body); margin-bottom: 15px;">
+              Contact us on WhatsApp or submit our inquiry form to view coordinates, rates, and schedule an on-site property tour.
+            </p>
+            <a href="/#/ghar-jagga/${item.id}" class="btn btn-primary" style="padding: 12px 24px; border-radius: 12px; background: var(--primary); color: white; font-weight: 600;">Inquire About Property</a>
+          </div>
+        </article>
+      `;
+
+      const pageData = {
+        title: `${item.title} in ${item.locality} | Kotha Jagir Solution`,
+        description: `${item.title} property for ${item.category} in ${item.locality}. View details, layout, and contact broker.`,
+        keywords: `${item.title}, property for rent kathmandu, land plot for sale kathmandu`,
+        ogTitle: `${item.title}`,
+        ogDescription: `${item.title} property for ${item.category} in ${item.locality}.`,
+        ogType: "article",
+        ogUrl: `https://kothajagir.com.np/ghar-jagga/${item.id}`,
+        ogImage: item.cover_photo_url,
+        canonicalUrl: `https://kothajagir.com.np/ghar-jagga/${item.id}`,
+        noindex: isArchived,
+        schema: {
+          "@context": "https://schema.org",
+          "@type": "Place",
+          "name": item.title,
+          "description": item.description || '',
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": item.locality,
+            "addressCountry": "NP"
+          }
+        },
+        bodyHtml
+      };
+      const html = generateHtmlTemplate(pageData);
+      setSeoCache(cacheKey, html);
+      return res.send(html);
+    } catch (err) {
+      return next();
+    }
+});
+
 // Serve static frontend files from the public/ folder only.
 // This prevents server-side files (.env, server.js, db.js, etc.)
 // from being exposed over HTTP.
@@ -167,6 +880,9 @@ function authenticateMember(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Unauthorized: No active member session' });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role === 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Member access only' });
+    }
     req.member = decoded;
     next();
   } catch (err) {
@@ -180,6 +896,9 @@ function authenticateAdmin(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Unauthorized: Admin access required' });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Admin access only' });
+    }
     req.admin = decoded;
     next();
   } catch (err) {
@@ -253,7 +972,7 @@ app.get('/api/settings/qr-code', async (req, res) => {
 
 // --- PUBLIC LISTINGS ---
 app.get('/api/listings', async (req, res) => {
-  const { type, locality, category, roomType, parking, suitableFor, jobType, experience, budget } = req.query;
+  const { type, locality, category, roomType, parking, suitableFor, jobType, experience, budget, salary } = req.query;
   try {
     // Automatically purge listings archived more than 30 days ago
     try {
@@ -277,53 +996,81 @@ app.get('/api/listings', async (req, res) => {
     const params = [];
     let paramCount = 0;
 
+    // 1. Filter by marketplace / type
     if (type) {
       if (type === 'ghar-jagga') {
         query += " AND (type = 'land' OR type = 'house')";
-      } else {
+      } else if (type === 'room' || type === 'job' || type === 'land' || type === 'house') {
         paramCount++;
         query += ` AND type = $${paramCount}`;
         params.push(type);
+      } else {
+        return res.status(400).json({ error: 'Invalid type parameter' });
       }
     }
+
+    // 2. Filter by locality (applicable to all marketplaces)
     if (locality) {
       paramCount++;
       query += ` AND locality = $${paramCount}`;
       params.push(locality);
     }
-    if (category) {
-      paramCount++;
-      query += ` AND category = $${paramCount}`;
-      params.push(category);
-    }
-    if (roomType) {
-      paramCount++;
-      query += ` AND category = $${paramCount}`;
-      params.push(roomType);
-    }
-    if (budget) {
-      paramCount++;
-      query += ` AND price_or_salary <= $${paramCount}`;
-      params.push(parseInt(budget));
+
+    // 3. Segmented filtering based on listing type
+    const resolvedType = type || '';
+    if (resolvedType === 'room') {
+      if (roomType) {
+        paramCount++;
+        query += ` AND category = $${paramCount}`;
+        params.push(roomType);
+      }
+      if (budget) {
+        paramCount++;
+        query += ` AND price_or_salary <= $${paramCount}`;
+        params.push(parseInt(budget));
+      }
+      if (parking && parking !== 'any') {
+        paramCount++;
+        query += ` AND (attributes->>'parking')::boolean = $${paramCount}`;
+        params.push(parking === 'yes');
+      }
+      if (suitableFor) {
+        paramCount++;
+        query += ` AND attributes->>'suitableFor' = $${paramCount}`;
+        params.push(suitableFor);
+      }
+    } else if (resolvedType === 'job') {
+      if (category) {
+        paramCount++;
+        query += ` AND category = $${paramCount}`;
+        params.push(category);
+      }
+      const maxSalary = salary || budget;
+      if (maxSalary) {
+        paramCount++;
+        query += ` AND price_or_salary <= $${paramCount}`;
+        params.push(parseInt(maxSalary));
+      }
+      if (jobType) {
+        paramCount++;
+        query += ` AND attributes->>'jobType' = $${paramCount}`;
+        params.push(jobType);
+      }
+      if (experience) {
+        paramCount++;
+        query += ` AND attributes->>'experience' = $${paramCount}`;
+        params.push(experience);
+      }
+    } else if (resolvedType === 'ghar-jagga' || resolvedType === 'land' || resolvedType === 'house') {
+      if (category) { // 'For Sale' / 'For Rent'
+        paramCount++;
+        query += ` AND category = $${paramCount}`;
+        params.push(category);
+      }
     }
 
     const result = await pool.query(query, params);
     let listings = result.rows;
-
-    // Filter in-memory JSONB attributes
-    if (parking && parking !== 'any') {
-      const isParking = parking === 'yes';
-      listings = listings.filter(l => l.attributes?.parking === isParking);
-    }
-    if (suitableFor) {
-      listings = listings.filter(l => l.attributes?.suitableFor === suitableFor);
-    }
-    if (jobType) {
-      listings = listings.filter(l => l.attributes?.jobType === jobType);
-    }
-    if (experience) {
-      listings = listings.filter(l => l.attributes?.experience === experience);
-    }
 
     // Map database model to frontend shape
     const formatted = listings.map(l => ({
@@ -385,7 +1132,9 @@ app.get('/api/listings', async (req, res) => {
 app.get('/api/listings/:id', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM listings WHERE id = $1', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Listing not found' });
+    if (result.rows.length === 0 || result.rows[0].status === 'deleted') {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
     const l = result.rows[0];
     res.json({
       id: l.id,
@@ -432,6 +1181,17 @@ app.post('/api/applications', upload.fields([
 
     if (!frontFile || (!isPassport && !backFile)) {
       return res.status(400).json({ error: isPassport ? 'Passport info page image is required' : 'Both identity document front and back file images are required' });
+    }
+
+    // Security Hardening: Validate file size (max 10MB)
+    if (frontFile.size > 10 * 1024 * 1024 || (backFile && backFile.size > 10 * 1024 * 1024)) {
+      return res.status(400).json({ error: 'Identity documents must be less than 10MB each' });
+    }
+
+    // Security Hardening: Validate file types
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowedMimeTypes.includes(frontFile.mimetype) || (backFile && !allowedMimeTypes.includes(backFile.mimetype))) {
+      return res.status(400).json({ error: 'Identity documents must be images (JPEG, PNG, WebP) or PDF files' });
     }
 
     // Verify unique email across pending/active database records, but allow refilling if previous was rejected
@@ -621,12 +1381,7 @@ app.post('/api/admin/login', async (req, res) => {
     if (result.rows.length === 0) return res.status(400).json({ error: 'Invalid admin credentials' });
 
     const admin = result.rows[0];
-    let valid = false;
-    if (password === 'admin@123') {
-      valid = true;
-    } else {
-      valid = await bcrypt.compare(password, admin.password_hash);
-    }
+    const valid = await bcrypt.compare(password, admin.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid admin credentials' });
 
     const token = jwt.sign({ id: admin.id, email: admin.email, role: 'admin' }, JWT_SECRET, { expiresIn: '1d' });
@@ -704,7 +1459,7 @@ app.post('/api/admin/reset-password', async (req, res) => {
   try {
     // 1. Verify OTP has been marked as used recently for security verification
     const result = await pool.query(
-      'SELECT * FROM otp_codes WHERE email = $1 AND code = $2 AND expires_at > (NOW() - INTERVAL \'15 minutes\') ORDER BY created_at DESC LIMIT 1',
+      'SELECT * FROM otp_codes WHERE email = $1 AND code = $2 AND used = true AND expires_at > (NOW() - INTERVAL \'15 minutes\') ORDER BY created_at DESC LIMIT 1',
       [email, code]
     );
     if (result.rows.length === 0) return res.status(400).json({ error: 'Session expired. Please request a new OTP.' });
@@ -719,7 +1474,10 @@ app.post('/api/admin/reset-password', async (req, res) => {
 
     const admin = updateRes.rows[0];
 
-    // 4. Log in immediately
+    // 4. Delete the used OTP code so it cannot be re-used
+    await pool.query('DELETE FROM otp_codes WHERE email = $1 AND code = $2', [email, code]);
+
+    // 5. Log in immediately
     const token = jwt.sign({ id: admin.id, email: admin.email, role: 'admin' }, JWT_SECRET, { expiresIn: '1d' });
     res.cookie('admin_token', token, {
       httpOnly: true,
@@ -979,6 +1737,36 @@ app.post('/api/admin/listings', authenticateAdmin, upload.fields([
     const video = req.files?.video?.[0];
     const galleryPhotos = req.files?.gallery_photos || [];
 
+    const allowedImgMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    const allowedVidMimes = ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/webm', 'video/3gpp', 'video/avi', 'video/mpeg'];
+
+    if (coverPhoto) {
+      if (!allowedImgMimes.includes(coverPhoto.mimetype)) {
+        return res.status(400).json({ error: 'Cover photo must be an image (JPEG, PNG, WebP)' });
+      }
+      if (coverPhoto.size > 15 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Cover photo must be less than 15MB' });
+      }
+    }
+
+    if (video) {
+      if (!allowedVidMimes.includes(video.mimetype)) {
+        return res.status(400).json({ error: 'Video must be a valid video file' });
+      }
+      if (video.size > 250 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Video must be less than 250MB' });
+      }
+    }
+
+    for (const file of galleryPhotos) {
+      if (!allowedImgMimes.includes(file.mimetype)) {
+        return res.status(400).json({ error: 'Gallery photos must be images (JPEG, PNG, WebP)' });
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Gallery photos must be less than 15MB each' });
+      }
+    }
+
     const parsedAttr = JSON.parse(attributes || '{}');
     let coverUrl = null;
     if (coverPhoto) {
@@ -1012,6 +1800,7 @@ app.post('/api/admin/listings', authenticateAdmin, upload.fields([
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active')
     `, [type, title, description, parsedPrice, locality, category, coverUrl, galleryUrls, videoUrl, parsedAttr]);
 
+    clearSeoCache();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1028,6 +1817,37 @@ app.put('/api/admin/listings/:id', authenticateAdmin, upload.fields([
     const coverPhoto = req.files?.cover_photo?.[0];
     const video = req.files?.video?.[0];
     const galleryPhotos = req.files?.gallery_photos || [];
+
+    const allowedImgMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    const allowedVidMimes = ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/webm', 'video/3gpp', 'video/avi', 'video/mpeg'];
+
+    if (coverPhoto) {
+      if (!allowedImgMimes.includes(coverPhoto.mimetype)) {
+        return res.status(400).json({ error: 'Cover photo must be an image (JPEG, PNG, WebP)' });
+      }
+      if (coverPhoto.size > 15 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Cover photo must be less than 15MB' });
+      }
+    }
+
+    if (video) {
+      if (!allowedVidMimes.includes(video.mimetype)) {
+        return res.status(400).json({ error: 'Video must be a valid video file' });
+      }
+      if (video.size > 250 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Video must be less than 250MB' });
+      }
+    }
+
+    for (const file of galleryPhotos) {
+      if (!allowedImgMimes.includes(file.mimetype)) {
+        return res.status(400).json({ error: 'Gallery photos must be images (JPEG, PNG, WebP)' });
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Gallery photos must be less than 15MB each' });
+      }
+    }
+
     const parsedAttr = JSON.parse(attributes || '{}');
 
     let coverUrl = null;
@@ -1081,6 +1901,7 @@ app.put('/api/admin/listings/:id', authenticateAdmin, upload.fields([
     params.push(req.params.id);
 
     await pool.query(query, params);
+    clearSeoCache();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1124,6 +1945,7 @@ app.delete('/api/admin/listings/:id', authenticateAdmin, async (req, res) => {
       "UPDATE listings SET status='archived', archived_at=NOW(), gallery_photo_urls='{}', video_url=NULL WHERE id=$1",
       [listingId]
     );
+    clearSeoCache();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1143,6 +1965,7 @@ app.delete('/api/admin/listings/:id/permanent', authenticateAdmin, async (req, r
 
     // 2. Mark as deleted in database
     await pool.query("UPDATE listings SET status='deleted' WHERE id=$1", [listingId]);
+    clearSeoCache();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1168,6 +1991,15 @@ app.patch('/api/admin/settings', authenticateAdmin, async (req, res) => {
 app.post('/api/admin/settings/qr-code', authenticateAdmin, upload.single('qr_code'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'File upload required' });
+    
+    const allowedImgMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedImgMimes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'QR code must be an image (JPEG, PNG, WebP)' });
+    }
+    if (req.file.size > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'QR code must be less than 10MB' });
+    }
+
     const qrResized = await resizeImageBuffer(req.file.buffer);
     const qrUrl = await uploadPublicFile(qrResized, `qr_${Date.now()}_${req.file.originalname}`, req.file.mimetype);
 
@@ -1334,20 +2166,18 @@ async function seedDatabaseIfEmpty() {
       console.log('Seeded job_categories list.');
     }
 
-    // Seed default admin account if not present
-    const adminCheck = await pool.query('SELECT count(*) FROM admin WHERE email = $1', ['sadikshyapokhrel177@gmail.com']);
-    if (parseInt(adminCheck.rows[0].count) === 0) {
-      await pool.query(`
-        INSERT INTO admin (email, password_hash, whatsapp_number) VALUES
-        ('sadikshyapokhrel177@gmail.com', '$2b$10$wT5gS.H51EwJ3J5D5W5hEOYt7vX.0lRz0D.G1aHhE2iF5eG6h7i8j', '9779841234567')
-      `);
-      console.log('Seeded master admin account credentials.');
-    }
+    // Seed default admin account if not present or update it to match valid seed
+    await pool.query(`
+      INSERT INTO admin (email, password_hash, whatsapp_number) VALUES
+      ('sadikshyapokhrel177@gmail.com', '$2a$10$O2EC2pDhawLtAPchh.vnJuxkeIi.gEsZ1B9QysU1KTBGCN9pmKuRC', '9779841234567')
+      ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, whatsapp_number = EXCLUDED.whatsapp_number
+    `);
+    console.log('Master admin account credentials synced.');
 
     await pool.query(`
       INSERT INTO settings (key, value) VALUES
       ('whatsapp_number', '{"value": "9779841234567"}'::jsonb),
-      ('payment_qr_code', '{"value": "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400&q=80"}'::jsonb)
+      ('payment_qr_code', '{"value": "/default_payment_qr.png"}'::jsonb)
       ON CONFLICT (key) DO NOTHING
     `);
     console.log('Database operational settings validated.');
