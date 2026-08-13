@@ -249,7 +249,7 @@ function renderFooter() {
         <div>
           <div class="footer-heading">Contact</div>
           <ul class="footer-links">
-            <li><a href="https://maps.app.goo.gl/TGED8soknA4d8DcE6" target="_blank" rel="noopener noreferrer">${Icon.map} Kathmandu, Nepal</a></li>
+            <li><a href="https://maps.app.goo.gl/TGED8soknA4d8DcE6" target="_blank" rel="noopener noreferrer">${Icon.map} Location</a></li>
             <li><a href="tel:9813822333">9813822333</a></li>
             <li><a href="tel:9819897468">9819897468</a></li>
             <li><a href="tel:97144499122">97144499122</a></li>
@@ -866,6 +866,11 @@ function renderApplyFlow(listingId) {
       ${renderFooter()}
     `;
   }
+
+  const item = State.currentListing;
+  if (!item) return renderNotFound();
+  const step = State.applyStep;
+  let wizardContentHtml = '';
 
   if (!State.applyFormData.idtype) {
     State.applyFormData.idtype = 'citizenship';
