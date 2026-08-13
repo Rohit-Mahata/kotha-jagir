@@ -2665,3 +2665,32 @@ textarea.form-control {
     text-align: left;
   }
 }
+
+/*  RESPONSIVE APPLY CARD & FOOTER BUTTONS  */
+.apply-card {
+  padding: 32px;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.06);
+}
+
+@media (max-width: 576px) {
+  .apply-card {
+    padding: 20px 16px;
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    width: 100%;
+    padding: 14px 16px;
+    gap: 10px;
+  }
+  
+  .modal-footer .btn {
+    width: 100%;
+    white-space: normal;
+    text-align: center;
+    padding: 12px 20px;
+    min-height: 44px;
+  }
+}
