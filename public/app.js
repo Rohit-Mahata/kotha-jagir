@@ -249,7 +249,7 @@ function renderFooter() {
         <div>
           <div class="footer-heading">Contact</div>
           <ul class="footer-links">
-            <li><a href="#">Kathmandu, Nepal</a></li>
+            <li><a href="https://maps.app.goo.gl/TGED8soknA4d8DcE6" target="_blank" rel="noopener noreferrer">${Icon.map} Kathmandu, Nepal</a></li>
             <li><a href="tel:9813822333">9813822333</a></li>
             <li><a href="tel:9819897468">9819897468</a></li>
             <li><a href="tel:97144499122">97144499122</a></li>
@@ -412,7 +412,7 @@ function renderListingCard(item) {
     <div class="card-body">
       <div class="card-title">${item.title}</div>
       <div class="card-price">
-        ${isGharJagga ? `<span style="font-size:0.85rem;color:var(--primary);font-weight:600;">Contact admin for rate details</span>` : `
+        ${isGharJagga ? `<span style="font-size:0.85rem;color:var(--primary);font-weight:600;">Contact for further information</span>` : `
           ${item.priceLabel || item.salaryLabel} <span>${isRoom ? '/month' : item.jobType ? ` ${item.jobType}` : ''}</span>
         `}
       </div>
@@ -477,7 +477,7 @@ function renderHomePage() {
   if (State.loading['listings']) {
     bodyContentHtml = `
       <div class="container" style="padding: 60px 0; text-align: center;">
-        <div class="video-loading-spinner" style="display: block; position: relative; margin: 0 auto 20px;"></div>
+        <div class="spinner" style="margin: 0 auto 20px;"></div>
         <p style="color: var(--text-muted);">Fetching listings from Kathmandu Valley...</p>
       </div>
     `;
@@ -526,6 +526,18 @@ function renderHomePage() {
     ${renderFilterBar()}
     ${bodyContentHtml}
   </div>
+
+  <!-- ABOUT KOTHA JAGIR SEO SECTION -->
+  <section class="section" style="padding: 40px 0 0 0;">
+    <div class="container text-center">
+      <div style="max-width: 800px; margin: 0 auto; padding: 28px; border-radius: 16px; background: rgba(255, 255, 255, 0.4); border: 1px solid rgba(255, 255, 255, 0.5); backdrop-filter: blur(8px); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.03);">
+        <h2 style="font-family: var(--font-heading); font-size: 1.4rem; margin-bottom: 12px; color: var(--text-dark); font-weight: 600;">Welcome to Kotha Jagir</h2>
+        <p class="text-muted" style="font-size: 0.92rem; line-height: 1.7; margin: 0;">
+          Kotha Jagir helps you find rooms for rent, flats for rent, and kotha bhada across Kathmandu — including Koteshwor, New Baneshwor, Kalanki, Chabahil, Lazimpat, Maharajgunj, Thamel, and Pepsicola. We also list job vacancies (jagir) and ghar jagga (land and house) across Kathmandu Valley.
+        </p>
+      </div>
+    </div>
+  </section>
 
   <!-- HOW IT WORKS -->
   <section class="section bg-glass-section">
@@ -596,7 +608,7 @@ function renderDetailPage(id) {
     return `
       ${renderNavbar()}
       <div class="container" style="padding: 100px 0; text-align: center;">
-        <div class="video-loading-spinner" style="display: block; position: relative; margin: 0 auto 20px;"></div>
+        <div class="spinner" style="margin: 0 auto 20px;"></div>
         <p style="color: var(--text-muted);">Loading listing details...</p>
       </div>
       ${renderFooter()}
@@ -616,6 +628,14 @@ function renderDetailPage(id) {
 
   const item = State.currentListing;
   if (!item) return renderNotFound();
+
+  if (item.type === 'room') {
+    document.title = `${item.title} - Room for Rent in ${item.locality} | Kotha Jagir`;
+  } else if (item.type === 'job') {
+    document.title = `${item.title} - Job Vacancy in ${item.locality} | Kotha Jagir`;
+  } else if (item.type === 'land' || item.type === 'house') {
+    document.title = `${item.title} - Land/House for Sale in ${item.locality} | Kotha Jagir`;
+  }
 
   const isRoom = item.type === 'room';
   const isJob = item.type === 'job';
@@ -644,8 +664,8 @@ function renderDetailPage(id) {
               </div>
               <div>
                 ${isGharJagga ? `
-                  <div style="font-family:var(--font-heading);font-size:1.25rem;font-weight:700;color:var(--primary);text-align:right">Contact For Rate</div>
-                  <div style="font-size:0.8rem;color:var(--text-muted);text-align:right">Rate on request</div>
+                  <div style="font-family:var(--font-heading);font-size:1.25rem;font-weight:700;color:var(--primary);text-align:right">Contact for further information</div>
+                  <div style="font-size:0.8rem;color:var(--text-muted);text-align:right">Information on request</div>
                 ` : `
                   <div style="font-family:var(--font-heading);font-size:1.8rem;font-weight:700;color:var(--primary)">${item.priceLabel || item.salaryLabel}</div>
                   <div style="font-size:0.8rem;color:var(--text-muted);text-align:right">${isRoom ? 'per month' : item.jobType}</div>
@@ -840,18 +860,17 @@ function renderApplyFlow(listingId) {
     return `
       ${renderNavbar()}
       <div class="container" style="padding: 100px 0; text-align: center;">
-        <div class="video-loading-spinner" style="display: block; position: relative; margin: 0 auto 20px;"></div>
+        <div class="spinner" style="margin: 0 auto 20px;"></div>
         <p style="color: var(--text-muted);">Configuring application flow...</p>
       </div>
       ${renderFooter()}
     `;
   }
 
-  const item = State.currentListing;
-  if (!item) return renderNotFound();
-  const step = State.applyStep;
-
-  let wizardContentHtml = '';
+  if (!State.applyFormData.idtype) {
+    State.applyFormData.idtype = 'citizenship';
+  }
+  const isPassport = State.applyFormData.idtype === 'passport';
 
   if (step === 1) {
     wizardContentHtml = `
@@ -881,7 +900,7 @@ function renderApplyFlow(listingId) {
           </div>
           <div class="form-group">
             <label for="ap-idtype">Verification ID Type</label>
-            <select id="ap-idtype" class="form-control" onchange="State.applyFormData.idtype=this.value">
+            <select id="ap-idtype" class="form-control" onchange="State.applyFormData.idtype=this.value; if(this.value==='passport'){ delete State.applyFormData.citBack; delete State.applyFormData.citBackFile; } render();">
               <option value="citizenship" ${State.applyFormData.idtype === 'citizenship' ? 'selected' : ''}>Citizenship Certificate</option>
               <option value="passport" ${State.applyFormData.idtype === 'passport' ? 'selected' : ''}>National Passport</option>
             </select>
@@ -899,22 +918,33 @@ function renderApplyFlow(listingId) {
         </div>
 
         <div style="background:rgba(255,255,255,0.6);border:1px solid rgba(200,185,175,0.4);border-radius:12px;padding:16px;margin-bottom:20px">
-          <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;color:var(--primary);margin-bottom:12px;">
-            🔒 Upload Verification Document (Restricted Admin Review Only)
+          <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;color:var(--primary);margin-bottom:6px;">
+            🔒 Secure Identity Verification
           </div>
+          <p style="font-size:0.75rem;color:var(--text-muted);line-height:1.5;margin-bottom:12px;">
+            Upload your document. It is stored securely and only reviewed by Kotha Jagir administrators to verify your profile and prevent fraud.
+          </p>
           
-          <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-            <div>
-              <label for="ap-citfront" style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">Front side image <span class="required">*</span></label>
+          ${isPassport ? `
+            <div class="form-group">
+              <label for="ap-citfront" style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">Passport Information / Bio Page image <span class="required">*</span></label>
               <input id="ap-citfront" type="file" accept="image/*" class="form-control" onchange="handleCitUpload('front', this)" ${State.applyFormData.citFront ? '' : 'required'} />
-              ${State.applyFormData.citFront ? `<img src="${State.applyFormData.citFront}" alt="Front review" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-top:8px;" />` : ''}
+              ${State.applyFormData.citFront ? `<img src="${State.applyFormData.citFront}" alt="Passport Bio Page review" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-top:8px;" />` : ''}
             </div>
-            <div>
-              <label for="ap-citback" style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">Back side image <span class="required">*</span></label>
-              <input id="ap-citback" type="file" accept="image/*" class="form-control" onchange="handleCitUpload('back', this)" ${State.applyFormData.citBack ? '' : 'required'} />
-              ${State.applyFormData.citBack ? `<img src="${State.applyFormData.citBack}" alt="Back review" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-top:8px;" />` : ''}
+          ` : `
+            <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div>
+                <label for="ap-citfront" style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">Citizenship front side image <span class="required">*</span></label>
+                <input id="ap-citfront" type="file" accept="image/*" class="form-control" onchange="handleCitUpload('front', this)" ${State.applyFormData.citFront ? '' : 'required'} />
+                ${State.applyFormData.citFront ? `<img src="${State.applyFormData.citFront}" alt="Front review" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-top:8px;" />` : ''}
+              </div>
+              <div>
+                <label for="ap-citback" style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">Citizenship back side image <span class="required">*</span></label>
+                <input id="ap-citback" type="file" accept="image/*" class="form-control" onchange="handleCitUpload('back', this)" ${State.applyFormData.citBack ? '' : 'required'} />
+                ${State.applyFormData.citBack ? `<img src="${State.applyFormData.citBack}" alt="Back review" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-top:8px;" />` : ''}
+              </div>
             </div>
-          </div>
+          `}
         </div>
 
         <div class="modal-footer" style="padding-top:10px;">
@@ -1088,7 +1118,7 @@ function renderMemberDashboard() {
   if (State.loading['applications']) {
     bodyHtml = `
       <div style="text-align:center; padding:60px 0;">
-        <div class="video-loading-spinner" style="display:block; position:relative; margin:0 auto 16px;"></div>
+        <div class="spinner" style="margin:0 auto 16px;"></div>
         <p style="color:var(--text-muted)">Connecting dashboard data...</p>
       </div>
     `;
@@ -1383,7 +1413,7 @@ function renderAdminDashboard() {
 
 function renderAdminRequests() {
   if (State.loading['admin_apps']) {
-    return `<div class="text-center" style="padding: 40px;"><div class="video-loading-spinner" style="display:block;margin:0 auto;"></div></div>`;
+    return `<div class="text-center" style="padding: 40px;"><div class="spinner" style="margin:0 auto;"></div></div>`;
   }
   const pending = State.applications ? State.applications.filter(a => a.status === 'pending') : [];
   const approved = State.applications ? State.applications.filter(a => a.status === 'approved') : [];
@@ -1433,7 +1463,7 @@ function renderAdminRequests() {
 
 function renderAdminListings() {
   if (State.loading['admin_listings']) {
-    return `<div class="text-center" style="padding: 40px;"><div class="video-loading-spinner" style="display:block;margin:0 auto;"></div></div>`;
+    return `<div class="text-center" style="padding: 40px;"><div class="spinner" style="margin:0 auto;"></div></div>`;
   }
   const isRoom = State.adminListingTab === 'room';
   const isJob = State.adminListingTab === 'job';
@@ -1481,7 +1511,7 @@ function renderAdminListings() {
 
 function renderAdminApplications() {
   if (State.loading['admin_apps']) {
-    return `<div class="text-center" style="padding: 40px;"><div class="video-loading-spinner" style="display:block;margin:0 auto;"></div></div>`;
+    return `<div class="text-center" style="padding: 40px;"><div class="spinner" style="margin:0 auto;"></div></div>`;
   }
   const apps = State.applications || [];
 
@@ -1673,7 +1703,7 @@ function renderAdminSettings() {
 
 function renderAdminInquiries() {
   if (State.loading['admin_inquiries']) {
-    return `<div class="text-center" style="padding: 40px;"><div class="video-loading-spinner" style="display:block;margin:0 auto;"></div></div>`;
+    return `<div class="text-center" style="padding: 40px;"><div class="spinner" style="margin:0 auto;"></div></div>`;
   }
   const items = State.inquiries || [];
 
@@ -1899,15 +1929,19 @@ function renderAppModal() {
           <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:6px">
             🔒 Identity Verification documents (Admin Only View)
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="display:grid;grid-template-columns:${app.id_type === 'passport' ? '1fr' : '1fr 1fr'};gap:12px">
             <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Card Front View</div>
-              <img src="${app.citizenshipFront || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=80'}" alt="Document Front" style="width:100%;height:140px;object-fit:cover;border-radius:8px;border:1px solid rgba(0,0,0,0.15)" />
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">
+                ${app.id_type === 'passport' ? 'Passport Information / Bio Page' : 'Card Front View'}
+              </div>
+              <img src="${app.citizenshipFront || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=80'}" alt="Document Front" style="width:100%;height:180px;object-fit:cover;border-radius:8px;border:1px solid rgba(0,0,0,0.15)" />
             </div>
+            ${app.id_type !== 'passport' ? `
             <div>
               <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Card Back View</div>
-              <img src="${app.citizenshipBack || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80'}" alt="Document Back" style="width:100%;height:140px;object-fit:cover;border-radius:8px;border:1px solid rgba(0,0,0,0.15)" />
+              <img src="${app.citizenshipBack || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80'}" alt="Document Back" style="width:100%;height:180px;object-fit:cover;border-radius:8px;border:1px solid rgba(0,0,0,0.15)" />
             </div>
+            ` : ''}
           </div>
         </div>
       </div>
@@ -1941,14 +1975,16 @@ function renderNotFound() {
 window.setMode = function (m) {
   State.mode = m;
   State.listings = null;
-  if (m === 'ghar-jagga') {
-    navigate('#/ghar-jagga');
+  
+  let targetHash = '#/rooms';
+  if (m === 'ghar-jagga') targetHash = '#/ghar-jagga';
+  else if (m === 'jobs') targetHash = '#/jobs';
+  
+  const currentHash = location.hash;
+  if (currentHash === targetHash) {
+    render();
   } else {
-    if (location.hash.startsWith('#/ghar-jagga')) {
-      navigate('#/');
-    } else {
-      render();
-    }
+    navigate(targetHash);
   }
 };
 
@@ -2042,6 +2078,19 @@ window.submitApplyStep1 = function (e) {
   const date = document.getElementById('ap-date').value;
   const msg = document.getElementById('ap-msg').value;
 
+  if (idtype === 'passport') {
+    if (!State.applyFormData.citFrontFile && !State.applyFormData.citFront) {
+      showToast('Please upload your Passport Bio Page image.', 'error');
+      return;
+    }
+  } else {
+    if ((!State.applyFormData.citFrontFile && !State.applyFormData.citFront) || 
+        (!State.applyFormData.citBackFile && !State.applyFormData.citBack)) {
+      showToast('Please upload both Front and Back images of your Citizenship Certificate.', 'error');
+      return;
+    }
+  }
+
   State.applyFormData = {
     ...State.applyFormData,
     name, phone, email, occ, idtype, date, msg
@@ -2078,7 +2127,7 @@ window.submitApplyStep2 = async function () {
     if (State.applyFormData.citFrontFile) {
       form.append('citizenship_front', State.applyFormData.citFrontFile);
     }
-    if (State.applyFormData.citBackFile) {
+    if (State.applyFormData.idtype !== 'passport' && State.applyFormData.citBackFile) {
       form.append('citizenship_back', State.applyFormData.citBackFile);
     }
 
@@ -2769,12 +2818,14 @@ function render() {
   if (!isInitialized) {
     app.innerHTML = `
       <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#F6F1EA; font-family:sans-serif;">
-        <div class="video-loading-spinner" style="display:block; position:relative; top:auto; left:auto; transform:none; margin-bottom:20px;"></div>
+        <div class="spinner" style="margin-bottom:20px;"></div>
         <div style="color:#2b2724; font-weight:600; font-size:1.1rem; letter-spacing:0.5px;">Loading Kotha Jagir Solution...</div>
       </div>
     `;
     return;
   }
+
+  document.title = "Kotha Jagir - Room Finder & Job Finder in Kathmandu, Nepal | Kotha Bhada";
 
   const { path, params } = parseRoute();
   State.route = path;
@@ -2782,8 +2833,11 @@ function render() {
 
   let html = '';
 
-  if (path === '/' || path === '') {
-    if (State.mode === 'ghar-jagga') State.mode = 'rooms'; // fallback
+  if (path === '/' || path === '' || path === '/rooms') {
+    State.mode = 'rooms';
+    html = renderHomePage();
+  } else if (path === '/jobs' && !params.id) {
+    State.mode = 'jobs';
     html = renderHomePage();
   } else if (path === '/ghar-jagga') {
     if (params.id) {

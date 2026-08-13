@@ -428,8 +428,10 @@ app.post('/api/applications', upload.fields([
     const frontFile = req.files?.citizenship_front?.[0];
     const backFile = req.files?.citizenship_back?.[0];
 
-    if (!frontFile || !backFile) {
-      return res.status(400).json({ error: 'Both identity document front and back file images are required' });
+    const isPassport = id_type === 'passport';
+
+    if (!frontFile || (!isPassport && !backFile)) {
+      return res.status(400).json({ error: isPassport ? 'Passport info page image is required' : 'Both identity document front and back file images are required' });
     }
 
     // Verify unique email across pending/active database records, but allow refilling if previous was rejected
@@ -453,7 +455,7 @@ app.post('/api/applications', upload.fields([
 
     // Upload front/back images to private storage R2 bucket
     const frontKey = await uploadPrivateFile(frontFile.buffer, `front_${email}_${frontFile.originalname}`, frontFile.mimetype);
-    const backKey = await uploadPrivateFile(backFile.buffer, `back_${email}_${backFile.originalname}`, backFile.mimetype);
+    const backKey = backFile ? await uploadPrivateFile(backFile.buffer, `back_${email}_${backFile.originalname}`, backFile.mimetype) : null;
 
     // Encrypt password
     const salt = await bcrypt.genSalt(10);
@@ -563,8 +565,8 @@ app.get('/api/member/applications', authenticateMember, async (req, res) => {
 
     const applications = [];
     for (const row of result.rows) {
-      const frontUrl = await getPrivateFileUrl(row.citizenship_front_url).catch(() => '');
-      const backUrl = await getPrivateFileUrl(row.citizenship_back_url).catch(() => '');
+      const frontUrl = row.citizenship_front_url ? await getPrivateFileUrl(row.citizenship_front_url).catch(() => '') : '';
+      const backUrl = row.citizenship_back_url ? await getPrivateFileUrl(row.citizenship_back_url).catch(() => '') : '';
 
       applications.push({
         id: row.id,
@@ -764,8 +766,8 @@ app.get('/api/admin/applications', authenticateAdmin, async (req, res) => {
 
     const list = [];
     for (const row of result.rows) {
-      const frontUrl = await getPrivateFileUrl(row.citizenship_front_url).catch(() => '');
-      const backUrl = await getPrivateFileUrl(row.citizenship_back_url).catch(() => '');
+      const frontUrl = row.citizenship_front_url ? await getPrivateFileUrl(row.citizenship_front_url).catch(() => '') : '';
+      const backUrl = row.citizenship_back_url ? await getPrivateFileUrl(row.citizenship_back_url).catch(() => '') : '';
 
       list.push({
         id: row.id,
@@ -929,7 +931,8 @@ app.get('/api/admin/applications/:id/pdf', authenticateAdmin, async (req, res) =
         doc.fontSize(9).fillColor('#c00').text(`[Back Side Image Error: ${imgErr.message}]`, doc.x + 240, currentY);
       }
     } else {
-      doc.fontSize(9).fillColor('#666').text('[Back side image not loaded]', doc.x + 240, currentY);
+      const isPassport = row.id_type === 'passport';
+      doc.fontSize(9).fillColor('#666').text(isPassport ? '[Back side image not required for Passport]' : '[Back side image not loaded]', doc.x + 240, currentY);
     }
 
     doc.end();

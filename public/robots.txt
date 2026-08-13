@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://kothajagir.com.np/sitemap.xml
