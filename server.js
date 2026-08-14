@@ -490,6 +490,21 @@ app.get('/ghar-jagga', async (req, res, next) => {
     } catch (err) {
       return next();
     }
+// --- SEO Spelled/Singular Redirects ---
+app.get('/ghar-jagir', (req, res) => {
+  res.redirect(301, '/ghar-jagga');
+});
+app.get('/ghar-jagir/:id', (req, res) => {
+  res.redirect(301, `/ghar-jagga/${req.params.id}`);
+});
+app.get('/room', (req, res) => {
+  res.redirect(301, '/rooms');
+});
+app.get('/rooms/:id', (req, res) => {
+  res.redirect(301, `/room/${req.params.id}`);
+});
+app.get('/job', (req, res) => {
+  res.redirect(301, '/jobs');
 });
 
 app.get('/room/:id', async (req, res, next) => {

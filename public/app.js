@@ -93,31 +93,45 @@ function parseRoute() {
   }
 
   const params = {};
-  if (segments[0] === 'room') {
-    if (segments[1]) params.id = segments[1];
-    if (segments[2]) params.sub = segments[2];
-    return { path: '/room', params, full };
+  const normSegment = segments[0].toLowerCase();
+
+  if (normSegment === 'room' || normSegment === 'rooms') {
+    if (segments[1]) {
+      params.id = segments[1];
+      if (segments[2]) params.sub = segments[2];
+      return { path: '/room', params, full };
+    } else {
+      return { path: '/rooms', params, full };
+    }
   }
-  if (segments[0] === 'jobs') {
-    if (segments[1]) params.id = segments[1];
-    if (segments[2]) params.sub = segments[2];
-    return { path: '/jobs', params, full };
+  if (normSegment === 'job' || normSegment === 'jobs') {
+    if (segments[1]) {
+      params.id = segments[1];
+      if (segments[2]) params.sub = segments[2];
+      return { path: '/jobs', params, full };
+    } else {
+      return { path: '/jobs', params, full };
+    }
   }
-  if (segments[0] === 'ghar-jagga') {
-    if (segments[1]) params.id = segments[1];
-    if (segments[2]) params.sub = segments[2];
-    return { path: '/ghar-jagga', params, full };
+  if (normSegment === 'ghar-jagga' || normSegment === 'ghar-jagir') {
+    if (segments[1]) {
+      params.id = segments[1];
+      if (segments[2]) params.sub = segments[2];
+      return { path: '/ghar-jagga', params, full };
+    } else {
+      return { path: '/ghar-jagga', params, full };
+    }
   }
-  if (segments[0] === 'apply') {
+  if (normSegment === 'apply') {
     if (segments[1]) params.id = segments[1];
     return { path: '/apply', params, full };
   }
-  if (segments[0] === 'admin') {
+  if (normSegment === 'admin') {
     if (segments[1] === 'dashboard') return { path: '/admin', params: { sub: 'dashboard' }, full };
     return { path: '/admin', params: {}, full };
   }
-  if (segments[0] === 'login') return { path: '/login', params, full };
-  if (segments[0] === 'dashboard') return { path: '/dashboard', params, full };
+  if (normSegment === 'login') return { path: '/login', params, full };
+  if (normSegment === 'dashboard') return { path: '/dashboard', params, full };
 
   return { path: '/' + segments[0], params, full };
 }
