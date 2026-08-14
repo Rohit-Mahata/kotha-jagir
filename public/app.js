@@ -72,6 +72,17 @@ const SUITABLE_FOR = ['Family', 'Student', 'Bachelor', 'Office'];
 const AMENITIES_LIST = ['Wifi', 'Parking', 'Furnished', 'Water Supply', 'Electricity Backup', 'CCTV', 'Elevator', 'Balcony', 'Kitchen', 'AC'];
 const JOB_REQUIREMENTS = ['English Speaking', 'Experience Required', 'Uniform Provided', 'Meals Included', 'Accommodation', 'Training', 'Insurance', '2-Wheeler'];
 
+function formatWhatsappNumber(num) {
+  let digits = (num || '').replace(/\D/g, '');
+  if (digits.startsWith('00')) {
+    digits = digits.substring(2);
+  }
+  if (digits.startsWith('9') && !digits.startsWith('977')) {
+    digits = '977' + digits;
+  }
+  return digits;
+}
+
 // // ROUTER //""""""""""""""""""""""""""""""""""""""""""""""""
 function parseRoute() {
   const hasHash = window.location.hash !== '';
@@ -803,7 +814,7 @@ function renderDetailPage(id) {
                     Submitted! Contact our administrator directly via WhatsApp or phone.
                   </p>
                   <div style="display:flex;flex-direction:column;gap:10px">
-                    <a href="https://wa.me/${State.adminWhatsapp}?text=${encodeURIComponent(`Hi, I'm interested in the land/house listing "${item.title}" (${item.locality}). I just submitted an inquiry form. Could you share the rate and further details?`)}" target="_blank" class="btn btn-success w-full" style="display:flex;align-items:center;justify-content:center;gap:8px">
+                    <a href="https://wa.me/${formatWhatsappNumber(State.adminWhatsapp)}?text=${encodeURIComponent(`Hi, I'm interested in the land/house listing "${item.title}" (${item.locality}). I just submitted an inquiry form. Could you share the rate and further details?`)}" target="_blank" class="btn btn-success w-full" style="display:flex;align-items:center;justify-content:center;gap:8px">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm5.835-3.279c1.614.957 3.513 1.463 5.461 1.465 5.75.003 10.429-4.675 10.432-10.43.001-2.788-1.084-5.409-3.056-7.382C16.758 2.395 14.138 1.3 11.348 1.3c-5.748 0-10.428 4.677-10.43 10.432-.001 1.86.486 3.68 1.41 5.295L1.31 22.7l5.63-1.478.021-.001zM17.65 19.3c-.3-.15-1.785-.88-2.065-.98-.28-.1-.49-.15-.69.15-.2.3-.77.98-.95 1.18-.18.2-.35.23-.65.08-1.02-.51-1.785-1.01-2.485-1.63-.52-.46-.8-.85-1.01-1.22-.21-.37-.02-.57.17-.72.17-.13.37-.43.56-.65.2-.22.26-.37.4-.63.14-.27.07-.49-.03-.7-.1-.2-.89-2.14-1.22-2.94-.32-.78-.65-.68-.89-.69-.23-.01-.49-.01-.75-.01-.26 0-.69.1-1.05.49-.36.39-1.39 1.36-1.39 3.32c0 1.96 1.43 3.85 1.63 4.12.2.27 2.8 4.28 6.79 6c.95.41 1.69.66 2.27.85.96.3 1.84.26 2.53.16.77-.11 2.38-.97 2.72-1.92.34-.95.34-1.76.24-1.93-.11-.17-.4-.27-.7-.42z"/></svg>
                       Contact via WhatsApp
                     </a>
@@ -1136,7 +1147,7 @@ I am sending my payment screenshot for verification.
 
 Please verify my payment.`;
 
-    const cleanWaNumber = (State.adminWhatsapp || '9779841234567').replace(/\+/g, '').replace(/\s+/g, '');
+    const cleanWaNumber = formatWhatsappNumber(State.adminWhatsapp || '9779841234567');
     const waUrl = `https://wa.me/${cleanWaNumber}?text=${encodeURIComponent(msg)}`;
 
     wizardContentHtml = `
