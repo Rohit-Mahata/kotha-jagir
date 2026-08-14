@@ -74,11 +74,12 @@ const JOB_REQUIREMENTS = ['English Speaking', 'Experience Required', 'Uniform Pr
 
 // // ROUTER //""""""""""""""""""""""""""""""""""""""""""""""""
 function parseRoute() {
-  const hash = location.hash.replace('#', '').replace(/^\//, '') || '';
+  const hasHash = window.location.hash !== '';
   let segments = [];
   let full = '';
 
-  if (hash) {
+  if (hasHash) {
+    const hash = window.location.hash.replace('#', '').replace(/^\//, '') || '';
     segments = hash.split('/').filter(Boolean);
     full = hash;
   } else {
@@ -628,6 +629,9 @@ function renderDetailPage(id) {
   }
 
   if (State.errors['listing_' + id]) {
+    if (State.errors['listing_' + id] === 'Listing not found') {
+      return renderNotFound();
+    }
     return `
       ${renderNavbar()}
       <div class="container text-center" style="padding: 100px 0;">
@@ -640,6 +644,23 @@ function renderDetailPage(id) {
 
   const item = State.currentListing;
   if (!item) return renderNotFound();
+
+  // Validate expected type against current path prefix
+  const pathPrefix = State.route; // e.g. '/room', '/jobs', '/ghar-jagga'
+  const isRoomItem = item.type === 'room';
+  const isJobItem = item.type === 'job';
+  const isGharJaggaItem = item.type === 'land' || item.type === 'house';
+
+  if ((pathPrefix === '/room' && !isRoomItem) ||
+      (pathPrefix === '/jobs' && !isJobItem) ||
+      (pathPrefix === '/ghar-jagga' && !isGharJaggaItem)) {
+    return renderNotFound();
+  }
+
+  // Handle archived/booked redirection
+  if (item.booked) {
+    return renderArchivedPage(item.id, item.type);
+  }
 
   if (item.type === 'room') {
     document.title = `${item.title} - Room for Rent in ${item.locality} | Kotha Jagir`;
@@ -824,15 +845,79 @@ function renderDetailPage(id) {
 
 // 3. ARCHIVED PAGE
 function renderArchivedPage(id, type) {
-  // Simple view containing basic locked details for reference
+  if (State.currentListing === null && !State.loading['listing_' + id] && !State.errors['listing_' + id]) {
+    State.loading['listing_' + id] = true;
+    API.getListing(id)
+      .then(res => {
+        State.currentListing = res;
+        State.loading['listing_' + id] = false;
+        render();
+      })
+      .catch(err => {
+        State.errors['listing_' + id] = err.message;
+        State.loading['listing_' + id] = false;
+        render();
+      });
+  }
+
+  if (State.loading['listing_' + id]) {
+    return `
+      ${renderNavbar()}
+      <div class="container" style="padding: 100px 0; text-align: center;">
+        <div class="spinner" style="margin: 0 auto 20px;"></div>
+        <p style="color: var(--text-muted);">Loading archived details...</p>
+      </div>
+      ${renderFooter()}
+    `;
+  }
+
+  if (State.errors['listing_' + id]) {
+    if (State.errors['listing_' + id] === 'Listing not found') {
+      return renderNotFound();
+    }
+    return `
+      ${renderNavbar()}
+      <div class="container text-center" style="padding: 100px 0;">
+        <p style="color: var(--danger); font-weight: 600; margin-bottom:16px;">Listing detail load failed: ${State.errors['listing_' + id]}</p>
+        <a href="#/" class="btn btn-primary">Back to Listings</a>
+      </div>
+      ${renderFooter()}
+    `;
+  }
+
+  const item = State.currentListing;
+  if (!item) return renderNotFound();
+
+  // Validate type match
+  const isRoomItem = item.type === 'room';
+  const isJobItem = item.type === 'job';
+  const isGharJaggaItem = item.type === 'land' || item.type === 'house';
+
+  if ((type === 'room' && !isRoomItem) ||
+      (type === 'job' && !isJobItem) ||
+      ((type === 'ghar-jagga' || type === 'land' || type === 'house') && !isGharJaggaItem)) {
+    return renderNotFound();
+  }
+
+  // If active, render detail view instead
+  if (!item.booked) {
+    return renderDetailPage(id);
+  }
+
+  const isRoom = item.type === 'room';
+  const isJob = item.type === 'job';
+  const icon = isRoom ? '🏠' : (isJob ? '💼' : '🏡');
+  const title = isRoom ? 'Already Booked' : (isJob ? 'Position Filled' : 'Property Sold/Rented');
+  const descText = `This ${isRoom ? 'rental flat/room' : (isJob ? 'job position' : 'property')} has been successfully filled. The listing is archived and kept online temporarily for application auditing reference.`;
+
   return `
   ${renderNavbar()}
   <div class="archived-page" style="padding: 80px 0; background: #F6F1EA; min-height: 80vh; display: flex; align-items: center; justify-content: center;">
     <div class="archived-card glass" style="max-width: 480px; width: 100%; border-radius: 16px; padding: 32px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
-      <div style="font-size:3.5rem;margin-bottom:16px">${type === 'room' ? '🏠' : '💼'}</div>
-      <h2 style="margin-bottom:12px; font-family: var(--font-heading);">${type === 'room' ? 'Already Booked' : 'Position Filled'}</h2>
+      <div style="font-size:3.5rem;margin-bottom:16px">${icon}</div>
+      <h2 style="margin-bottom:12px; font-family: var(--font-heading);">${title}</h2>
       <p class="text-muted" style="margin-bottom:16px; font-size:0.9rem; line-height:1.6;">
-        This ${type === 'room' ? 'rental flat/room' : 'job position'} has been successfully filled. The listing is archived and kept online temporarily for application auditing reference.
+        ${descText}
       </p>
       <a href="#/" class="btn btn-primary" style="margin-top:14px;">Browse Other Listings ${Icon.arrow}</a>
     </div>
@@ -881,6 +966,17 @@ function renderApplyFlow(listingId) {
 
   const item = State.currentListing;
   if (!item) return renderNotFound();
+
+  // Validate expected types (only room and job applications are supported)
+  if (item.type !== 'room' && item.type !== 'job') {
+    return renderNotFound();
+  }
+
+  // Handle archived/booked redirection
+  if (item.booked) {
+    return renderArchivedPage(item.id, item.type);
+  }
+
   const step = State.applyStep;
   let wizardContentHtml = '';
 
@@ -1010,19 +1106,55 @@ function renderApplyFlow(listingId) {
       </div>
     `;
   } else if (step === 3) {
+    const email = State.applyFormData.email || '';
+    const appId = State.applyGeneratedId || '';
+    
+    // Construct WhatsApp message content
+    const msg = `Hi Kotha Jagir,
+
+I have submitted an application.
+
+Application ID: ${appId}
+Email: ${email}
+
+I have completed the required payment.
+I am sending my payment screenshot for verification.
+
+Please verify my payment.`;
+
+    const cleanWaNumber = (State.adminWhatsapp || '9779841234567').replace(/\+/g, '').replace(/\s+/g, '');
+    const waUrl = `https://wa.me/${cleanWaNumber}?text=${encodeURIComponent(msg)}`;
+
     wizardContentHtml = `
-      <div style="text-align:center;padding:20px 10px">
-        <div style="font-size:4rem;margin-bottom:18px;">✅</div>
-        <h2 style="margin-bottom:12px;font-family:var(--font-heading);">Application Submitted!</h2>
-        <p class="text-muted" style="max-width:440px;margin:0 auto 24px;font-size:0.9rem;line-height:1.6">
-          Your application ID is <strong style="color:var(--text-dark);font-family:monospace">${State.applyGeneratedId}</strong>.<br>
-          We sent a notification request to the administrators. You will be redirected to WhatsApp to present payment proof screenshot.
+      <div style="text-align: center; padding: 20px 10px;">
+        <div style="font-size: 4rem; margin-bottom: 16px; color: var(--success);">✓</div>
+        <h2 style="margin-bottom: 8px; font-family: var(--font-heading); color: var(--text-dark);">Application Submitted Successfully</h2>
+        <p class="text-muted" style="margin-bottom: 24px; font-size: 0.95rem;">
+          Your application ID is: <strong style="color: var(--text-dark); font-family: monospace; font-size: 1.05rem;">${appId}</strong>
         </p>
-        <div style="background:rgba(212,162,76,0.06);border:1px solid rgba(212,162,76,0.25);border-radius:10px;padding:14px;max-width:400px;margin:0 auto 24px;font-size:0.85rem;line-height:1.6">
-          🔐 <strong>Pending Review</strong><br>
-          Once verified, log in with your email <strong style="font-family:monospace">${State.applyFormData.email}</strong> and chosen password.
+
+        <div class="glass" style="border-radius: 12px; padding: 20px; text-align: left; margin-bottom: 24px; border: 1px solid rgba(0,0,0,0.1);">
+          <h3 style="margin-top: 0; margin-bottom: 14px; font-family: var(--font-heading); color: var(--primary); font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+            💵 Payment &amp; Verification Instructions
+          </h3>
+          <ol style="margin: 0; padding-left: 20px; font-size: 0.9rem; line-height: 1.6; color: var(--text-body);">
+            <li style="margin-bottom: 8px;">Complete the required verification payment of <strong>Rs. 500</strong>.</li>
+            <li style="margin-bottom: 8px;">Take a clear screenshot of your payment confirmation.</li>
+            <li style="margin-bottom: 8px;">Click <strong>"Send Payment Screenshot on WhatsApp"</strong> below to open WhatsApp.</li>
+            <li style="margin-bottom: 8px;"><strong style="color: var(--danger);">Please attach your payment screenshot manually</strong> in WhatsApp before sending the message.</li>
+            <li>Send the pre-filled message to the Kotha Jagir admin.</li>
+          </ol>
         </div>
-        <button class="btn btn-primary" onclick="navigate('#/')">Return to Homepage</button>
+
+        <div style="display: flex; flex-direction: column; gap: 12px; align-items: center;">
+          <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-success" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 20px; font-size: 1rem; font-weight: 600;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm5.835-3.279c1.614.957 3.513 1.463 5.461 1.465 5.75.003 10.429-4.675 10.432-10.43.001-2.788-1.084-5.409-3.056-7.382C16.758 2.395 14.138 1.3 11.348 1.3c-5.748 0-10.428 4.677-10.43 10.432-.001 1.86.486 3.68 1.41 5.295L1.31 22.7l5.63-1.478.021-.001zM17.65 19.3c-.3-.15-1.785-.88-2.065-.98-.28-.1-.49-.15-.69.15-.2.3-.77.98-.95 1.18-.18.2-.35.23-.65.08-1.02-.51-1.785-1.01-2.485-1.63-.52-.46-.85-1.01-1.22-.21-.37-.02-.57.17-.72.17-.13.37-.43.56-.65.2-.22.26-.37.4-.63.14-.27.07-.49-.03-.7-.1-.2-.89-2.14-1.22-2.94-.32-.78-.65-.68-.89-.69-.23-.01-.49-.01-.75-.01-.26 0-.69.1-1.05.49-.36.39-1.39 1.36-1.39 3.32c0 1.96 1.43 3.85 1.63 4.12.2.27 2.8 4.28 6.79 6c.95.41 1.69.66 2.27.85.96.3 1.84.26 2.53.16.77-.11 2.38-.97 2.72-1.92.34-.95.34-1.76.24-1.93-.11-.17-.4-.27-.7-.42z"/></svg>
+            Send Payment Screenshot on WhatsApp
+          </a>
+          <button class="btn btn-outline" style="width: 100%; padding: 12px; font-size: 0.95rem;" onclick="navigate('#/')">
+            Back to Home
+          </button>
+        </div>
       </div>
     `;
   }
@@ -2150,17 +2282,8 @@ window.submitApplyStep2 = async function () {
 
     const res = await API.submitApplication(form);
     State.applyGeneratedId = res.id;
-
-    showToast('Redirecting to WhatsApp to send payment proof screenshot...', 'warning');
-
-    setTimeout(() => {
-      const waUrl = `https://wa.me/${State.adminWhatsapp}?text=` + encodeURIComponent(
-        `Hi Kotha Jagir, I paid Rs. 500 for application ID ${State.applyGeneratedId}. Email: ${State.applyFormData.email}`
-      );
-      window.open(waUrl, '_blank');
-      State.applyStep = 3;
-      render();
-    }, 1200);
+    State.applyStep = 3;
+    render();
 
   } catch (err) {
     showToast(`Submission failed: ${err.message}`, 'error');

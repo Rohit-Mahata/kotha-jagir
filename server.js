@@ -992,7 +992,7 @@ app.get('/api/listings', async (req, res) => {
     } catch (cleanErr) {
       console.error('[CLEANUP] Failed running archive cleanup:', cleanErr.message);
     }
-    let query = "SELECT * FROM listings WHERE status = 'active'";
+    let query = "SELECT * FROM listings WHERE (status = 'active' OR (status = 'archived' AND archived_at > NOW() - INTERVAL '30 days'))";
     const params = [];
     let paramCount = 0;
 
@@ -1069,6 +1069,8 @@ app.get('/api/listings', async (req, res) => {
       }
     }
 
+    query += " ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END ASC, created_at DESC";
+
     const result = await pool.query(query, params);
     let listings = result.rows;
 
@@ -1090,40 +1092,17 @@ app.get('/api/listings', async (req, res) => {
       furnished: l.attributes?.furnished,
       experience: l.attributes?.experience,
       jobType: l.attributes?.jobType,
-      images: [l.cover_photo_url, ...(l.gallery_photo_urls || [])].filter(Boolean),
+      images: l.status === 'archived' ? [l.cover_photo_url].filter(Boolean) : [l.cover_photo_url, ...(l.gallery_photo_urls || [])].filter(Boolean),
       postedDate: new Date(l.created_at).toISOString().split('T')[0],
       desc: l.description,
       amenities: l.attributes?.amenities || [],
       requirements: l.attributes?.requirements || [],
-      video_url: l.video_url,
+      video_url: l.status === 'archived' ? null : l.video_url,
       attributes: l.attributes,
-      booked: false
+      booked: l.status === 'archived'
     }));
 
-    // Fetch archived listings within last 30 days to render as "Already Booked" / "Position Filled"
-    const archived = await pool.query(
-      "SELECT * FROM listings WHERE status = 'archived' AND archived_at > NOW() - INTERVAL '30 days'"
-    );
-    const archivedFormatted = archived.rows.map(l => ({
-      id: l.id,
-      type: l.type,
-      title: l.title,
-      locality: l.locality,
-      roomType: l.type === 'room' ? l.category : undefined,
-      category: l.type === 'job' ? l.category : (l.type === 'land' || l.type === 'house' ? l.category : undefined),
-      price: l.type === 'room' ? l.price_or_salary : undefined,
-      salary: l.type === 'job' ? l.price_or_salary : undefined,
-      priceLabel: l.type === 'room' ? `Rs. ${l.price_or_salary.toLocaleString()}/mo` : undefined,
-      salaryLabel: l.type === 'job' ? `Rs. ${l.price_or_salary.toLocaleString()}/mo` : undefined,
-      contactForRate: (l.type === 'land' || l.type === 'house') ? true : undefined,
-      images: [l.cover_photo_url],
-      postedDate: new Date(l.created_at).toISOString().split('T')[0],
-      desc: l.description,
-      attributes: l.attributes,
-      booked: true
-    }));
-
-    res.json([...formatted, ...archivedFormatted]);
+    res.json(formatted);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1174,6 +1153,23 @@ app.post('/api/applications', upload.fields([
 ]), async (req, res) => {
   const { listing_id, full_name, phone, email, occupation, id_type, preferred_date, message, password } = req.body;
   try {
+    // Validate target listing first
+    const listingRes = await pool.query('SELECT title, type, status FROM listings WHERE id = $1', [listing_id]);
+    if (listingRes.rows.length === 0) {
+      return res.status(400).json({ error: 'Listing does not exist' });
+    }
+    const listing = listingRes.rows[0];
+
+    if (listing.status === 'deleted') {
+      return res.status(400).json({ error: 'This listing has been deleted and cannot receive applications' });
+    }
+    if (listing.status === 'archived') {
+      return res.status(400).json({ error: 'This listing is archived (already booked or filled) and cannot receive applications' });
+    }
+    if (listing.type !== 'room' && listing.type !== 'job') {
+      return res.status(400).json({ error: 'Applications are not supported for this listing type' });
+    }
+
     const frontFile = req.files?.citizenship_front?.[0];
     const backFile = req.files?.citizenship_back?.[0];
 
@@ -1224,9 +1220,6 @@ app.post('/api/applications', upload.fields([
     // Generate Verification ID
     const number = Math.floor(10000 + Math.random() * 89999);
     const verificationId = `GK-2026-${number}`;
-
-    const listingRes = await pool.query('SELECT title, type FROM listings WHERE id = $1', [listing_id]);
-    const listing = listingRes.rows[0];
 
     // Persist Application details
     const appResult = await pool.query(`
