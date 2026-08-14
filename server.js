@@ -1969,6 +1969,13 @@ app.delete('/api/admin/listings/:id/permanent', authenticateAdmin, async (req, r
 // --- ADMIN GENERAL SETTINGS & METRICS ---
 app.patch('/api/admin/settings', authenticateAdmin, async (req, res) => {
   const { whatsapp_number } = req.body;
+  if (!whatsapp_number) {
+    return res.status(400).json({ error: 'WhatsApp number is required' });
+  }
+  const digits = whatsapp_number.replace(/\D/g, '');
+  if (digits.length < 10 || digits.length > 14) {
+    return res.status(400).json({ error: 'Admin WhatsApp number must be between 10 and 14 digits.' });
+  }
   try {
     await pool.query(
       "INSERT INTO settings (key, value) VALUES ('whatsapp_number', $1::jsonb) " +

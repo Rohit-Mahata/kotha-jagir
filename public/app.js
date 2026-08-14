@@ -2763,6 +2763,11 @@ window.publishListing = async function () {
 window.saveAdminSettings = async function (e) {
   e.preventDefault();
   const whatsapp = document.getElementById('set-whatsapp').value.trim();
+  const digits = whatsapp.replace(/\D/g, '');
+  if (digits.length < 10 || digits.length > 14) {
+    showToast('Admin WhatsApp number must be between 10 and 14 digits.', 'error');
+    return;
+  }
   try {
     await API.updateAdminSettings(whatsapp);
     State.adminWhatsapp = whatsapp;
