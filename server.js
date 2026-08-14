@@ -490,6 +490,7 @@ app.get('/ghar-jagga', async (req, res, next) => {
     } catch (err) {
       return next();
     }
+});
 // --- SEO Spelled/Singular Redirects ---
 app.get('/ghar-jagir', (req, res) => {
   res.redirect(301, '/ghar-jagga');
